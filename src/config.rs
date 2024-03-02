@@ -1,15 +1,10 @@
-use std::{collections::HashMap, fmt, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use color_eyre::eyre::Result;
-use config::Value;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use derive_deref::{Deref, DerefMut};
 use ratatui::style::{Color, Modifier, Style};
-use serde::{
-  de::{self, Deserializer, MapAccess, Visitor},
-  Deserialize, Serialize,
-};
-use serde_json::Value as JsonValue;
+use serde::{de::Deserializer, Deserialize};
 
 use crate::{action::Action, mode::Mode};
 
@@ -201,7 +196,7 @@ pub fn key_event_to_string(key_event: &KeyEvent) -> String {
       char = format!("f({c})");
       &char
     },
-    KeyCode::Char(c) if c == ' ' => "space",
+    KeyCode::Char(' ') => "space",
     KeyCode::Char(c) => {
       char = c.to_string();
       &char
@@ -429,7 +424,7 @@ mod tests {
   #[test]
   fn test_parse_color_rgb() {
     let color = parse_color("rgb123");
-    let expected = 16 + 1 * 36 + 2 * 6 + 3;
+    let expected = 16 + 36 + 2 * 6 + 3;
     assert_eq!(color, Some(Color::Indexed(expected)));
   }
 

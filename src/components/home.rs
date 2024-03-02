@@ -37,8 +37,7 @@ impl Component for Home {
 
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
-      Action::Tick => {
-      },
+      Action::Tick => {},
       _ => {},
     }
     Ok(None)
@@ -49,4 +48,3 @@ impl Component for Home {
     Ok(())
   }
 }
-

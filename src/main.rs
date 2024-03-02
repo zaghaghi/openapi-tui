@@ -17,7 +17,7 @@ use color_eyre::eyre::Result;
 
 use crate::{
   app::App,
-  utils::{initialize_logging, initialize_panic_handler, version},
+  utils::{initialize_logging, initialize_panic_handler},
 };
 
 async fn tokio_main() -> Result<()> {
@@ -26,7 +26,7 @@ async fn tokio_main() -> Result<()> {
   initialize_panic_handler()?;
 
   let args = Cli::parse();
-  let mut app = App::new(args.tick_rate, args.frame_rate)?;
+  let mut app = App::new(args.openapi_path)?;
   app.run().await?;
 
   Ok(())

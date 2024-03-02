@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::{
   action::Action,
-  components::{home::Home, fps::FpsCounter, Component},
+  components::{fps::FpsCounter, home::Home, Component},
   config::Config,
   mode::Mode,
   tui,
@@ -14,8 +14,7 @@ use crate::{
 
 pub struct App {
   pub config: Config,
-  pub tick_rate: f64,
-  pub frame_rate: f64,
+  pub openapi_path: String,
   pub components: Vec<Box<dyn Component>>,
   pub should_quit: bool,
   pub should_suspend: bool,
@@ -24,19 +23,18 @@ pub struct App {
 }
 
 impl App {
-  pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
+  pub fn new(openapi_path: String) -> Result<Self> {
     let home = Home::new();
     let fps = FpsCounter::default();
     let config = Config::new()?;
     let mode = Mode::Home;
     Ok(Self {
-      tick_rate,
-      frame_rate,
       components: vec![Box::new(home), Box::new(fps)],
       should_quit: false,
       should_suspend: false,
       config,
       mode,
+      openapi_path,
       last_tick_key_events: Vec::new(),
     })
   }
@@ -44,7 +42,7 @@ impl App {
   pub async fn run(&mut self) -> Result<()> {
     let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
-    let mut tui = tui::Tui::new()?.tick_rate(self.tick_rate).frame_rate(self.frame_rate);
+    let mut tui = tui::Tui::new()?;
     // tui.mouse(true);
     tui.enter()?;
 
@@ -137,7 +135,7 @@ impl App {
       if self.should_suspend {
         tui.suspend()?;
         action_tx.send(Action::Resume)?;
-        tui = tui::Tui::new()?.tick_rate(self.tick_rate).frame_rate(self.frame_rate);
+        tui = tui::Tui::new()?;
         // tui.mouse(true);
         tui.enter()?;
       } else if self.should_quit {

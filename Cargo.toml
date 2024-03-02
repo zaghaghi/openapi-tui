@@ -2,7 +2,7 @@
 name = "openapi-tui"
 version = "0.1.0"
 edition = "2021"
-description = "View and try APIs with an openapi file"
+description = "Terminal UI to list, browse and run APIs defined with openapi spec."
 
 authors = ["Hamed Zaghaghi <hamed.zaghaghi@gmail.com>"]
 build = "build.rs"
