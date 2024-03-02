@@ -1,5 +1,5 @@
 # openapi-tui
 
-[![CI](https://github.com//openapi-tui/workflows/CI/badge.svg)](https://github.com//openapi-tui/actions)
+[![CI](https://github.com/zaghaghi/openapi-tui/workflows/CI/badge.svg)](https://github.com/zaghaghi/openapi-tui/actions)
 
-View and try APIs with an openapi file
+Terminal UI to list, browse and run APIs defined with openapi spec.
