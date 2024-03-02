@@ -6,10 +6,11 @@ use ratatui::{prelude::*, widgets::*};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{Component, Frame};
 use crate::{
   action::Action,
+  component::Component,
   config::{Config, KeyBindings},
+  tui::EventResponse,
 };
 
 #[derive(Default)]
@@ -38,6 +39,7 @@ impl Component for Home {
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
       Action::Tick => {},
+      Action::Error(err) => {},
       _ => {},
     }
     Ok(None)

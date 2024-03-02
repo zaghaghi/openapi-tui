@@ -5,6 +5,7 @@
 pub mod action;
 pub mod app;
 pub mod cli;
+pub mod component;
 pub mod components;
 pub mod config;
 pub mod tui;

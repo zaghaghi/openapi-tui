@@ -43,6 +43,10 @@ pub enum Event {
   Resize(u16, u16),
 }
 
+pub enum EventResponse<T> {
+  Continue(T),
+  Stop(T),
+}
 pub struct Tui {
   pub terminal: ratatui::Terminal<Backend<IO>>,
   pub task: JoinHandle<()>,
