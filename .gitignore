@@ -1,3 +1,4 @@
 /target
 .data/*.log
 .vscode/
+openapi.json

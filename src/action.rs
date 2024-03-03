@@ -20,4 +20,6 @@ pub enum Action {
   Error(String),
   Help,
   Focus(Pane),
+  Up,
+  Down,
 }

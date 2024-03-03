@@ -23,6 +23,7 @@ json5 = "0.4.1"
 lazy_static = "1.4.0"
 libc = "0.2.148"
 log = "0.4.20"
+oas3 = "0.4.0"
 pretty_assertions = "1.4.0"
 ratatui = { version = "0.26.0", features = ["serde", "macros"] }
 serde = { version = "1.0.188", features = ["derive"] }
@@ -35,6 +36,8 @@ tokio-util = "0.7.9"
 tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "serde"] }
+tui-input = "0.8.0"
+tui-textarea = "0.4.0"
 
 [build-dependencies]
 vergen = { version = "8.2.6", features = [ "build", "git", "gitoxide", "cargo" ]}

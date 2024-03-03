@@ -14,7 +14,6 @@ pub enum Mode {
 
 pub struct App {
   pub config: Config,
-  pub openapi_path: String,
   pub components: Vec<Box<dyn Component>>,
   pub should_quit: bool,
   pub should_suspend: bool,
@@ -24,7 +23,7 @@ pub struct App {
 
 impl App {
   pub fn new(openapi_path: String) -> Result<Self> {
-    let home = Home::new();
+    let home = Home::new(openapi_path);
     let config = Config::new()?;
     let mode = Mode::Home;
     Ok(Self {
@@ -33,7 +32,6 @@ impl App {
       should_suspend: false,
       config,
       mode,
-      openapi_path,
       last_tick_key_events: Vec::new(),
     })
   }
