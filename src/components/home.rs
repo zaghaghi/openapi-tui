@@ -3,7 +3,10 @@ use std::{collections::HashMap, default, rc::Rc, time::Duration};
 use color_eyre::{eyre::Result, owo_colors::OwoColorize};
 use crossterm::event::{KeyCode, KeyEvent};
 use oas3::{Error, Spec};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+  prelude::*,
+  widgets::{block::*, *},
+};
 use serde::{
   de::{self, Deserializer, Visitor},
   Deserialize, Serialize,
@@ -60,7 +63,7 @@ pub struct Home {
   openapi_path: String,
   openapi_spec: Option<Spec>,
   openapi_spec_operations_len: usize,
-  api_row_index: usize,
+  openapi_spec_operations_index: usize,
 }
 
 impl Home {
@@ -72,7 +75,7 @@ impl Home {
       openapi_path,
       openapi_spec: None,
       openapi_spec_operations_len: 0,
-      api_row_index: 0,
+      openapi_spec_operations_index: 0,
     }
   }
 
@@ -87,10 +90,21 @@ impl Home {
       area[0],
     );
     frame.render_widget(
-      Block::default().title("APIs").borders(Borders::ALL).border_style(match self.focus {
-        Pane::Apis => focued_border_style,
-        _ => Style::default(),
-      }),
+      Block::default()
+        .title("APIs")
+        .borders(Borders::ALL)
+        .border_style(match self.focus {
+          Pane::Apis => focued_border_style,
+          _ => Style::default(),
+        })
+        .title_bottom(
+          Line::from(format!(
+            "{} of {}",
+            self.openapi_spec_operations_index.saturating_add(1),
+            self.openapi_spec_operations_len
+          ))
+          .right_aligned(),
+        ),
       area[1],
     );
     frame.render_widget(
@@ -127,6 +141,24 @@ impl Home {
       area[2],
     );
   }
+
+  fn method_color(method: &str) -> Color {
+    // method.0 is private, so matching
+    if method == "GET" {
+      return Color::LightCyan;
+    }
+    if method == "POST" {
+      return Color::LightBlue;
+    }
+    if method == "PUT" {
+      return Color::LightYellow;
+    }
+    if method == "DELETE" {
+      return Color::LightRed;
+    }
+
+    Color::Gray
+  }
 }
 
 impl Component for Home {
@@ -157,7 +189,8 @@ impl Component for Home {
         match self.focus {
           Pane::Apis => {
             if self.openapi_spec_operations_len > 0 {
-              self.api_row_index = self.api_row_index.saturating_add(1) % self.openapi_spec_operations_len;
+              self.openapi_spec_operations_index =
+                self.openapi_spec_operations_index.saturating_add(1) % self.openapi_spec_operations_len;
             }
           },
           Pane::Profiles => {},
@@ -168,8 +201,9 @@ impl Component for Home {
         match self.focus {
           Pane::Apis => {
             if self.openapi_spec_operations_len > 0 {
-              self.api_row_index = self.api_row_index.saturating_add(self.openapi_spec_operations_len - 1)
-                % self.openapi_spec_operations_len;
+              self.openapi_spec_operations_index =
+                self.openapi_spec_operations_index.saturating_add(self.openapi_spec_operations_len - 1)
+                  % self.openapi_spec_operations_len;
             }
           },
           Pane::Profiles => {},
@@ -197,7 +231,7 @@ impl Component for Home {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let outer_layout = Layout::default()
       .direction(Direction::Horizontal)
-      .constraints(vec![Constraint::Min(20), Constraint::Percentage(100)])
+      .constraints(vec![Constraint::Min(30), Constraint::Percentage(100)])
       .split(frame.size());
 
     let left_panes = Layout::default()
@@ -210,17 +244,26 @@ impl Component for Home {
       .constraints(vec![Constraint::Max(5), Constraint::Fill(1), Constraint::Fill(1)])
       .split(outer_layout[1]);
 
+    let unknown = String::from("Unknown");
     if let Some(spec) = &self.openapi_spec {
-      let items = spec.operations().map(|operation| format!("{} {}", operation.1.as_str(), operation.0));
+      let items = spec.operations().map(|operation| {
+        Line::from(vec![
+          Span::styled(
+            format!("{:7}", operation.1.as_str()),
+            Style::default().fg(Home::method_color(operation.1.as_str())),
+          ),
+          Span::styled(
+            operation.2.summary.as_ref().unwrap_or(operation.2.operation_id.as_ref().unwrap_or(&unknown)),
+            Style::default().fg(Color::White),
+          ),
+        ])
+      });
 
       let list = List::new(items)
-      .block(Block::default().title("List").borders(Borders::ALL))
-      .style(Style::default().fg(Color::White))
-      .highlight_style(Style::default().add_modifier(Modifier::ITALIC).fg(Color::LightBlue))
-      .highlight_symbol(">>")
-      // .repeat_highlight_symbol(true)
-      .direction(ListDirection::TopToBottom);
-      let mut state = ListState::default().with_selected(Some(self.api_row_index));
+        .block(Block::default().title("List").borders(Borders::ALL))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
+        .direction(ListDirection::TopToBottom);
+      let mut state = ListState::default().with_selected(Some(self.openapi_spec_operations_index));
 
       frame.render_stateful_widget(list, left_panes[1], &mut state);
     }
