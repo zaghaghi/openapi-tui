@@ -6,6 +6,8 @@ use serde::{
 };
 use strum::Display;
 
+use crate::components::home::Pane;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Display, Deserialize)]
 pub enum Action {
   Tick,
@@ -17,4 +19,5 @@ pub enum Action {
   Refresh,
   Error(String),
   Help,
+  Focus(Pane),
 }
