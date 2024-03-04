@@ -1,24 +1,16 @@
-use std::{collections::HashMap, default, rc::Rc, time::Duration};
+use std::rc::Rc;
 
-use color_eyre::{eyre::Result, owo_colors::OwoColorize};
+use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use oas3::{Error, Spec};
+use oas3::Spec;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
-use serde::{
-  de::{self, Deserializer, Visitor},
-  Deserialize, Serialize,
-};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{
-  action::Action,
-  component::Component,
-  config::{Config, KeyBindings},
-  tui::EventResponse,
-};
+use crate::{action::Action, component::Component, config::Config, tui::EventResponse};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Pane {
