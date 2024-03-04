@@ -4,7 +4,12 @@ use ratatui::prelude::Rect;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::{action::Action, component::Component, components::home::Home, config::Config, tui};
+use crate::{
+  action::Action,
+  components::{home::Home, Page},
+  config::Config,
+  tui,
+};
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mode {
@@ -14,7 +19,7 @@ pub enum Mode {
 
 pub struct App {
   pub config: Config,
-  pub components: Vec<Box<dyn Component>>,
+  pub pages: Vec<Box<dyn Page>>,
   pub should_quit: bool,
   pub should_suspend: bool,
   pub mode: Mode,
@@ -27,7 +32,7 @@ impl App {
     let config = Config::new()?;
     let mode = Mode::Home;
     Ok(Self {
-      components: vec![Box::new(home)],
+      pages: vec![Box::new(home)],
       should_quit: false,
       should_suspend: false,
       config,
@@ -42,22 +47,22 @@ impl App {
     let mut tui = tui::Tui::new()?;
     tui.enter()?;
 
-    for component in self.components.iter_mut() {
+    for component in self.pages.iter_mut() {
       component.register_action_handler(action_tx.clone())?;
     }
 
-    for component in self.components.iter_mut() {
+    for component in self.pages.iter_mut() {
       component.register_config_handler(self.config.clone())?;
     }
 
-    for component in self.components.iter_mut() {
+    for component in self.pages.iter_mut() {
       component.init()?;
     }
 
     loop {
       if let Some(e) = tui.next().await {
         let mut stop_event_propagation = false;
-        for component in self.components.iter_mut() {
+        for component in self.pages.iter_mut() {
           if let Some(response) = component.handle_events(Some(e.clone()))? {
             match response {
               tui::EventResponse::Continue(action) => {
@@ -114,7 +119,7 @@ impl App {
           Action::Resize(w, h) => {
             tui.resize(Rect::new(0, 0, w, h))?;
             tui.draw(|f| {
-              for component in self.components.iter_mut() {
+              for component in self.pages.iter_mut() {
                 let r = component.draw(f, f.size());
                 if let Err(e) = r {
                   action_tx.send(Action::Error(format!("Failed to draw: {:?}", e))).unwrap();
@@ -124,7 +129,7 @@ impl App {
           },
           Action::Render => {
             tui.draw(|f| {
-              for component in self.components.iter_mut() {
+              for component in self.pages.iter_mut() {
                 let r = component.draw(f, f.size());
                 if let Err(e) = r {
                   action_tx.send(Action::Error(format!("Failed to draw: {:?}", e))).unwrap();
@@ -134,7 +139,7 @@ impl App {
           },
           _ => {},
         }
-        for component in self.components.iter_mut() {
+        for component in self.pages.iter_mut() {
           if let Some(action) = component.update(action.clone())? {
             action_tx.send(action)?
           };

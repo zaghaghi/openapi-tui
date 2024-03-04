@@ -10,7 +10,7 @@ use ratatui::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::Action, component::Component, config::Config, tui::EventResponse};
+use crate::{action::Action, components::Page, config::Config, tui::EventResponse};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Pane {
@@ -135,25 +135,17 @@ impl Home {
   }
 
   fn method_color(method: &str) -> Color {
-    // method.0 is private, so matching
-    if method == "GET" {
-      return Color::LightCyan;
+    match method {
+      "GET" => Color::LightCyan,
+      "POST" => Color::LightBlue,
+      "PUT" => Color::LightYellow,
+      "DELETE" => Color::LightRed,
+      _ => Color::Gray,
     }
-    if method == "POST" {
-      return Color::LightBlue;
-    }
-    if method == "PUT" {
-      return Color::LightYellow;
-    }
-    if method == "DELETE" {
-      return Color::LightRed;
-    }
-
-    Color::Gray
   }
 }
 
-impl Component for Home {
+impl Page for Home {
   fn init(&mut self) -> Result<()> {
     self.openapi_spec = Some(oas3::from_path(self.openapi_path.clone())?);
     self.openapi_spec_operations_len = match &self.openapi_spec {
