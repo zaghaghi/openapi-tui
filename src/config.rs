@@ -66,7 +66,7 @@ impl Config {
     for (mode, default_styles) in default_config.styles.iter() {
       let user_styles = cfg.styles.entry(*mode).or_default();
       for (style_key, style) in default_styles.iter() {
-        user_styles.entry(style_key.clone()).or_insert_with(|| style.clone());
+        user_styles.entry(style_key.clone()).or_insert_with(|| *style);
       }
     }
 

@@ -52,16 +52,3 @@ pub trait Page {
 
   fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()>;
 }
-
-pub trait Pane {
-  fn init(&mut self) -> Result<()> {
-    Ok(())
-  }
-
-  #[allow(unused_variables)]
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
-    Ok(None)
-  }
-
-  fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()>;
-}
