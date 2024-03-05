@@ -25,9 +25,9 @@ pub struct State {
 }
 
 impl State {
-  pub fn active_operation(&self) -> Option<&Operation> {
-    if let Some(operation) = self.openapi_spec.operations().nth(self.active_operation_index) {
-      Some(operation.2)
+  pub fn active_operation(&self) -> Option<(String, String, &Operation)> {
+    if let Some((path, method, operation)) = self.openapi_spec.operations().nth(self.active_operation_index) {
+      Some((path, method.to_string(), operation))
     } else {
       None
     }
@@ -44,6 +44,7 @@ pub struct Home {
   config: Config,
   panes: Vec<Box<dyn Pane>>,
   focused_pane_index: usize,
+  #[allow(dead_code)]
   state: Arc<RwLock<State>>,
 }
 

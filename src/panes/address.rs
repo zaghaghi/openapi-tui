@@ -32,6 +32,16 @@ impl AddressPane {
       false => Style::default(),
     }
   }
+
+  fn method_color(method: &str) -> Color {
+    match method {
+      "GET" => Color::LightCyan,
+      "POST" => Color::LightBlue,
+      "PUT" => Color::LightYellow,
+      "DELETE" => Color::LightRed,
+      _ => Color::Gray,
+    }
+  }
 }
 impl Pane for AddressPane {
   fn init(&mut self) -> Result<()> {
@@ -68,17 +78,26 @@ impl Pane for AddressPane {
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let state = self.state.read().unwrap();
-    let action_operation = state.active_operation();
-
-    let inner_margin = Margin { horizontal: 1, vertical: 1 };
-    frame
-      .render_widget(Block::default().title("Address").borders(Borders::ALL).border_style(self.border_style()), area);
-    let inner = area.inner(&inner_margin);
-    if let Some(operation) = action_operation {
-      if let Some(operation_id) = &operation.operation_id {
-        frame.render_widget(Paragraph::new(operation_id.as_str()), inner)
-      }
+    if let Some((path, method, operation)) = state.active_operation() {
+      let base_url = if let Some(server) = state.openapi_spec.primary_server() {
+        server.to_owned().url
+      } else {
+        String::from("http://localhost")
+      };
+      let title = operation.summary.clone().unwrap_or_default();
+      let inner_margin = Margin { horizontal: 2, vertical: 2 };
+      frame.render_widget(Block::default().title(title).borders(Borders::ALL).border_style(self.border_style()), area);
+      let inner = area.inner(&inner_margin);
+      frame.render_widget(
+        Paragraph::new(Line::from(vec![
+          Span::styled(format!("{:7}", method.as_str()), Style::default().fg(Self::method_color(method.as_str()))),
+          Span::styled(base_url, Style::default().fg(Color::DarkGray)),
+          Span::styled(path, Style::default().fg(Color::White)),
+        ])),
+        inner,
+      )
     }
+
     Ok(())
   }
 }

@@ -102,7 +102,7 @@ impl Pane for ApisPane {
       Line::from(vec![
         Span::styled(
           format!("{:7}", operation.1.as_str()),
-          Style::default().fg(ApisPane::method_color(operation.1.as_str())),
+          Style::default().fg(Self::method_color(operation.1.as_str())),
         ),
         Span::styled(
           operation.2.summary.as_ref().unwrap_or(operation.2.operation_id.as_ref().unwrap_or(&unknown)),
