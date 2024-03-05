@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
-use oas3::Spec;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
@@ -10,6 +9,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
+  pages::home::State,
   panes::Pane,
   tui::{EventResponse, Frame},
 };
@@ -17,20 +17,13 @@ use crate::{
 pub struct ApisPane {
   focused: bool,
   focused_border_style: Style,
-  openapi_spec: Arc<Spec>,
-  openapi_spec_operations_index: usize,
-  openapi_spec_operations_len: usize,
+  state: Arc<RwLock<State>>,
+  current_operation_index: usize,
 }
 
 impl ApisPane {
-  pub fn new(openapi_spec: Arc<Spec>, focused: bool, focused_border_style: Style) -> Self {
-    Self {
-      focused,
-      focused_border_style,
-      openapi_spec: openapi_spec.clone(),
-      openapi_spec_operations_index: 0,
-      openapi_spec_operations_len: openapi_spec.clone().operations().count(),
-    }
+  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
+    Self { focused, focused_border_style, state: state.clone(), current_operation_index: 0 }
   }
 
   fn border_style(&self) -> Style {
@@ -77,17 +70,24 @@ impl Pane for ApisPane {
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
       Action::Down => {
-        if self.openapi_spec_operations_len > 0 {
-          self.openapi_spec_operations_index =
-            self.openapi_spec_operations_index.saturating_add(1) % self.openapi_spec_operations_len;
+        let state = self.state.read().unwrap();
+        let operations_len = state.operations_len();
+        if operations_len > 0 {
+          self.current_operation_index = self.current_operation_index.saturating_add(1) % operations_len;
         }
       },
       Action::Up => {
-        if self.openapi_spec_operations_len > 0 {
-          self.openapi_spec_operations_index =
-            self.openapi_spec_operations_index.saturating_add(self.openapi_spec_operations_len - 1)
-              % self.openapi_spec_operations_len;
+        let state = self.state.read().unwrap();
+        let operations_len = state.operations_len();
+        if operations_len > 0 {
+          self.current_operation_index =
+            self.current_operation_index.saturating_add(operations_len - 1) % operations_len;
         }
+      },
+      Action::Submit => {
+        let mut state = self.state.write().unwrap();
+        state.active_operation_index = self.current_operation_index;
+        return Ok(Some(Action::Update));
       },
       _ => {},
     }
@@ -96,8 +96,9 @@ impl Pane for ApisPane {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
+    let state = self.state.read().unwrap();
     let unknown = String::from("Unknown");
-    let items = self.openapi_spec.operations().map(|operation| {
+    let items = state.openapi_spec.operations().map(|operation| {
       Line::from(vec![
         Span::styled(
           format!("{:7}", operation.1.as_str()),
@@ -114,18 +115,14 @@ impl Pane for ApisPane {
       .block(Block::default().title("List").borders(Borders::ALL))
       .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
       .direction(ListDirection::TopToBottom);
-    let mut state = ListState::default().with_selected(Some(self.openapi_spec_operations_index));
+    let mut list_state = ListState::default().with_selected(Some(self.current_operation_index));
 
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_stateful_widget(list, area, &mut list_state);
 
     frame.render_widget(
       Block::default().title("APIs").borders(Borders::ALL).border_style(self.border_style()).title_bottom(
-        Line::from(format!(
-          "{} of {}",
-          self.openapi_spec_operations_index.saturating_add(1),
-          self.openapi_spec_operations_len
-        ))
-        .right_aligned(),
+        Line::from(format!("{} of {}", self.current_operation_index.saturating_add(1), state.operations_len()))
+          .right_aligned(),
       ),
       area,
     );

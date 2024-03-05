@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use oas3::Spec;
+use oas3::{spec::Operation, Spec};
 use ratatui::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -18,35 +18,54 @@ use crate::{
 };
 
 #[derive(Default)]
+pub struct State {
+  pub openapi_path: String,
+  pub openapi_spec: Spec,
+  pub active_operation_index: usize,
+}
+
+impl State {
+  pub fn active_operation(&self) -> Option<&Operation> {
+    if let Some(operation) = self.openapi_spec.operations().nth(self.active_operation_index) {
+      Some(operation.2)
+    } else {
+      None
+    }
+  }
+
+  pub fn operations_len(&self) -> usize {
+    self.openapi_spec.operations().count()
+  }
+}
+
+#[derive(Default)]
 pub struct Home {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   panes: Vec<Box<dyn Pane>>,
   focused_pane_index: usize,
-  #[allow(dead_code)]
-  openapi_path: String,
-  #[allow(dead_code)]
-  openapi_spec: Arc<Spec>,
+  state: Arc<RwLock<State>>,
 }
 
 impl Home {
   pub fn new(openapi_path: String) -> Result<Self> {
+    let openapi_spec = oas3::from_path(openapi_path.clone())?;
+    let state = Arc::new(RwLock::new(State { openapi_spec, openapi_path, active_operation_index: 0 }));
     let focused_border_style = Style::default().fg(Color::LightGreen);
-    let openapi_spec = Arc::new(oas3::from_path(openapi_path.clone())?);
+
     Ok(Self {
       command_tx: None,
       config: Config::default(),
       panes: vec![
         Box::new(ProfilesPane::new(false, focused_border_style)),
-        Box::new(ApisPane::new(openapi_spec.clone(), true, focused_border_style)),
+        Box::new(ApisPane::new(state.clone(), true, focused_border_style)),
         Box::new(TagsPane::new(false, focused_border_style)),
-        Box::new(AddressPane::new(false, focused_border_style)),
+        Box::new(AddressPane::new(state.clone(), false, focused_border_style)),
         Box::new(RequestPane::new(false, focused_border_style)),
         Box::new(ResponsePane::new(false, focused_border_style)),
       ],
       focused_pane_index: 1,
-      openapi_path: openapi_path.clone(),
-      openapi_spec,
+      state,
     })
   }
 }
@@ -92,6 +111,11 @@ impl Page for Home {
           pane.focus()?;
         }
       },
+      Action::Update => {
+        for pane in self.panes.iter_mut() {
+          pane.update(action.clone())?;
+        }
+      },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           return pane.update(action);
@@ -107,6 +131,7 @@ impl Page for Home {
       KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),
       KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
       KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
+      KeyCode::Enter => EventResponse::Stop(Action::Submit),
       _ => {
         return Ok(None);
       },

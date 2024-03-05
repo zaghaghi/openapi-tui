@@ -1,3 +1,5 @@
+use std::sync::{Arc, RwLock};
+
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
@@ -7,6 +9,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
+  pages::home::State,
   panes::Pane,
   tui::{EventResponse, Frame},
 };
@@ -15,11 +18,12 @@ use crate::{
 pub struct AddressPane {
   focused: bool,
   focused_border_style: Style,
+  state: Arc<RwLock<State>>,
 }
 
 impl AddressPane {
-  pub fn new(focused: bool, focused_border_style: Style) -> Self {
-    Self { focused, focused_border_style }
+  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
+    Self { state, focused, focused_border_style }
   }
 
   fn border_style(&self) -> Style {
@@ -53,13 +57,28 @@ impl Pane for AddressPane {
     Ok(None)
   }
 
-  fn update(&mut self, _action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    match action {
+      Action::Update => {},
+      Action::Submit => {},
+      _ => {},
+    }
     Ok(None)
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
+    let state = self.state.read().unwrap();
+    let action_operation = state.active_operation();
+
+    let inner_margin = Margin { horizontal: 1, vertical: 1 };
     frame
       .render_widget(Block::default().title("Address").borders(Borders::ALL).border_style(self.border_style()), area);
+    let inner = area.inner(&inner_margin);
+    if let Some(operation) = action_operation {
+      if let Some(operation_id) = &operation.operation_id {
+        frame.render_widget(Paragraph::new(operation_id.as_str()), inner)
+      }
+    }
     Ok(())
   }
 }
