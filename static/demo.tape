@@ -3,37 +3,26 @@ Set Shell zsh
 
 Set FontSize 16
 Set Width 1200
-Set Height 600
+Set Height 800
 
-Type "cargo run -- --help"
-Sleep 500ms
-Enter
-Sleep 4s
-Type "cargo run -- --openapi-path examples/petstore.json"
+Set Padding 20
+Set FontFamily "JetBrains Mono"
+
+Set WindowBar Colorful
+
+Set Theme "Catppuccin Mocha"
+
+Type "cargo run -q -- --openapi-path examples/petstore.json"
 Sleep 2s
 Enter
 Sleep 1s
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
-Sleep 500ms
-Down
+Down@500ms 4
+Enter
 Sleep 1s
-Right
-Sleep 500ms
-Right
-Sleep 500ms
-Right
-Sleep 500ms
-Right
-Sleep 500ms
-Right
-Sleep 500ms
-Right
+Up@500ms 2
+Enter
+Sleep 1s
+Right@500ms 6
 Sleep 4s
 Type "q"
 Sleep 500ms
