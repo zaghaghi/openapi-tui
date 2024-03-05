@@ -5,5 +5,4 @@
 Terminal UI to list, browse and run APIs defined with openapi spec.
 
 # WIP
-
-![screenshot](static/screenshot.png)
+![alt text](static/demo.gif)
