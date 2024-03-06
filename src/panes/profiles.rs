@@ -28,6 +28,13 @@ impl ProfilesPane {
       false => Style::default(),
     }
   }
+
+  fn border_type(&self) -> BorderType {
+    match self.focused {
+      true => BorderType::Thick,
+      false => BorderType::Plain,
+    }
+  }
 }
 impl Pane for ProfilesPane {
   fn init(&mut self) -> Result<()> {
@@ -58,8 +65,14 @@ impl Pane for ProfilesPane {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    frame
-      .render_widget(Block::default().title("Profiles").borders(Borders::ALL).border_style(self.border_style()), area);
+    frame.render_widget(
+      Block::default()
+        .title("Profiles")
+        .borders(Borders::ALL)
+        .border_style(self.border_style())
+        .border_type(self.border_type()),
+      area,
+    );
     Ok(())
   }
 }

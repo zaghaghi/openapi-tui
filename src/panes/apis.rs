@@ -23,13 +23,20 @@ pub struct ApisPane {
 
 impl ApisPane {
   pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
-    Self { focused, focused_border_style, state: state.clone(), current_operation_index: 0 }
+    Self { focused, focused_border_style, state, current_operation_index: 0 }
   }
 
   fn border_style(&self) -> Style {
     match self.focused {
       true => self.focused_border_style,
       false => Style::default(),
+    }
+  }
+
+  fn border_type(&self) -> BorderType {
+    match self.focused {
+      true => BorderType::Thick,
+      false => BorderType::Plain,
     }
   }
 
@@ -89,6 +96,10 @@ impl Pane for ApisPane {
         state.active_operation_index = self.current_operation_index;
         return Ok(Some(Action::Update));
       },
+      Action::Update => {
+        let state = self.state.read().unwrap();
+        self.current_operation_index = state.active_operation_index;
+      },
       _ => {},
     }
 
@@ -98,8 +109,13 @@ impl Pane for ApisPane {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let state = self.state.read().unwrap();
     let unknown = String::from("Unknown");
-    let items = state.openapi_spec.operations().map(|operation| {
-      Line::from(vec![
+    let items = state.openapi_spec.operations().filter_map(|operation| {
+      if let Some(active_tag) = &state.active_tag_name {
+        if !operation.2.tags.contains(active_tag) {
+          return None;
+        }
+      }
+      Some(Line::from(vec![
         Span::styled(
           format!("{:7}", operation.1.as_str()),
           Style::default().fg(Self::method_color(operation.1.as_str())),
@@ -108,7 +124,7 @@ impl Pane for ApisPane {
           operation.2.summary.as_ref().unwrap_or(operation.2.operation_id.as_ref().unwrap_or(&unknown)),
           Style::default().fg(Color::White),
         ),
-      ])
+      ]))
     });
 
     let list = List::new(items)
@@ -118,12 +134,18 @@ impl Pane for ApisPane {
     let mut list_state = ListState::default().with_selected(Some(self.current_operation_index));
 
     frame.render_stateful_widget(list, area, &mut list_state);
-
+    let active_tag = format!("[{}]", state.active_tag_name.clone().unwrap_or(String::from("ALL")));
     frame.render_widget(
-      Block::default().title("APIs").borders(Borders::ALL).border_style(self.border_style()).title_bottom(
-        Line::from(format!("{} of {}", self.current_operation_index.saturating_add(1), state.operations_len()))
-          .right_aligned(),
-      ),
+      Block::default()
+        .title("APIs")
+        .borders(Borders::ALL)
+        .border_style(self.border_style())
+        .border_type(self.border_type())
+        .title_bottom(
+          Line::from(format!("{} of {}", self.current_operation_index.saturating_add(1), state.operations_len()))
+            .right_aligned(),
+        )
+        .title(Line::styled(active_tag, Style::default().add_modifier(Modifier::ITALIC)).right_aligned()),
       area,
     );
     Ok(())

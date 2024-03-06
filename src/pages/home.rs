@@ -22,19 +22,29 @@ pub struct State {
   pub openapi_path: String,
   pub openapi_spec: Spec,
   pub active_operation_index: usize,
+  pub active_tag_name: Option<String>,
 }
 
 impl State {
   pub fn active_operation(&self) -> Option<(String, String, &Operation)> {
-    if let Some((path, method, operation)) = self.openapi_spec.operations().nth(self.active_operation_index) {
-      Some((path, method.to_string(), operation))
-    } else {
-      None
+    if let Some(active_tag) = &self.active_tag_name {
+      if let Some((path, method, operation)) =
+        self.openapi_spec.operations().filter(|item| item.2.tags.contains(active_tag)).nth(self.active_operation_index)
+      {
+        return Some((path, method.to_string(), operation));
+      }
+    } else if let Some((path, method, operation)) = self.openapi_spec.operations().nth(self.active_operation_index) {
+      return Some((path, method.to_string(), operation));
     }
+    None
   }
 
   pub fn operations_len(&self) -> usize {
-    self.openapi_spec.operations().count()
+    if let Some(active_tag) = &self.active_tag_name {
+      self.openapi_spec.operations().filter(|item| item.2.tags.contains(active_tag)).count()
+    } else {
+      self.openapi_spec.operations().count()
+    }
   }
 }
 
@@ -51,7 +61,8 @@ pub struct Home {
 impl Home {
   pub fn new(openapi_path: String) -> Result<Self> {
     let openapi_spec = oas3::from_path(openapi_path.clone())?;
-    let state = Arc::new(RwLock::new(State { openapi_spec, openapi_path, active_operation_index: 0 }));
+    let state =
+      Arc::new(RwLock::new(State { openapi_spec, openapi_path, active_operation_index: 0, active_tag_name: None }));
     let focused_border_style = Style::default().fg(Color::LightGreen);
 
     Ok(Self {
@@ -60,7 +71,7 @@ impl Home {
       panes: vec![
         Box::new(ProfilesPane::new(false, focused_border_style)),
         Box::new(ApisPane::new(state.clone(), true, focused_border_style)),
-        Box::new(TagsPane::new(false, focused_border_style)),
+        Box::new(TagsPane::new(state.clone(), false, focused_border_style)),
         Box::new(AddressPane::new(state.clone(), false, focused_border_style)),
         Box::new(RequestPane::new(false, focused_border_style)),
         Box::new(ResponsePane::new(false, focused_border_style)),

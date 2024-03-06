@@ -33,6 +33,13 @@ impl AddressPane {
     }
   }
 
+  fn border_type(&self) -> BorderType {
+    match self.focused {
+      true => BorderType::Thick,
+      false => BorderType::Plain,
+    }
+  }
+
   fn method_color(method: &str) -> Color {
     match method {
       "GET" => Color::LightCyan,
@@ -86,7 +93,6 @@ impl Pane for AddressPane {
       };
       let title = operation.summary.clone().unwrap_or_default();
       let inner_margin = Margin { horizontal: 2, vertical: 2 };
-      frame.render_widget(Block::default().title(title).borders(Borders::ALL).border_style(self.border_style()), area);
       let inner = area.inner(&inner_margin);
       frame.render_widget(
         Paragraph::new(Line::from(vec![
@@ -95,7 +101,16 @@ impl Pane for AddressPane {
           Span::styled(path, Style::default().fg(Color::White)),
         ])),
         inner,
-      )
+      );
+
+      frame.render_widget(
+        Block::default()
+          .title(title)
+          .borders(Borders::ALL)
+          .border_style(self.border_style())
+          .border_type(self.border_type()),
+        area,
+      );
     }
 
     Ok(())

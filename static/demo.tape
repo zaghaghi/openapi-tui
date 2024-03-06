@@ -16,12 +16,19 @@ Type "cargo run -q -- --openapi-path examples/petstore.json"
 Sleep 2s
 Enter
 Sleep 1s
-Down@500ms 4
+Down@1s 4
 Enter
 Sleep 1s
 Up@500ms 2
 Enter
 Sleep 1s
+Right
+Down@1s 3
+Enter
+Sleep 1s
+Left
+Down@1s 4
+Enter
 Right@500ms 6
 Sleep 4s
 Type "q"
