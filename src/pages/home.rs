@@ -10,10 +10,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::Page,
-  panes::{
-    address::AddressPane, apis::ApisPane, profiles::ProfilesPane, request::RequestPane, response::ResponsePane,
-    tags::TagsPane, Pane,
-  },
+  panes::{address::AddressPane, apis::ApisPane, request::RequestPane, response::ResponsePane, tags::TagsPane, Pane},
   tui::EventResponse,
 };
 
@@ -69,14 +66,13 @@ impl Home {
       command_tx: None,
       config: Config::default(),
       panes: vec![
-        Box::new(ProfilesPane::new(false, focused_border_style)),
         Box::new(ApisPane::new(state.clone(), true, focused_border_style)),
         Box::new(TagsPane::new(state.clone(), false, focused_border_style)),
         Box::new(AddressPane::new(state.clone(), false, focused_border_style)),
-        Box::new(RequestPane::new(false, focused_border_style)),
+        Box::new(RequestPane::new(state.clone(), false, focused_border_style)),
         Box::new(ResponsePane::new(false, focused_border_style)),
       ],
-      focused_pane_index: 1,
+      focused_pane_index: 0,
       state,
     })
   }
@@ -159,20 +155,19 @@ impl Page for Home {
 
     let left_panes = Layout::default()
       .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(5), Constraint::Fill(3), Constraint::Fill(1)])
+      .constraints(vec![Constraint::Fill(3), Constraint::Fill(1)])
       .split(outer_layout[0]);
 
     let right_panes = Layout::default()
       .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(5), Constraint::Fill(1), Constraint::Fill(1)])
+      .constraints(vec![Constraint::Max(3), Constraint::Fill(1), Constraint::Fill(1)])
       .split(outer_layout[1]);
 
     self.panes[0].draw(frame, left_panes[0])?;
     self.panes[1].draw(frame, left_panes[1])?;
-    self.panes[2].draw(frame, left_panes[2])?;
-    self.panes[3].draw(frame, right_panes[0])?;
-    self.panes[4].draw(frame, right_panes[1])?;
-    self.panes[5].draw(frame, right_panes[2])?;
+    self.panes[2].draw(frame, right_panes[0])?;
+    self.panes[3].draw(frame, right_panes[1])?;
+    self.panes[4].draw(frame, right_panes[2])?;
     Ok(())
   }
 }

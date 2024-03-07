@@ -11,27 +11,30 @@ Set FontFamily "JetBrains Mono"
 Set WindowBar Colorful
 
 Set Theme "Catppuccin Mocha"
-
+Sleep 2s
 Type "cargo run -q -- --openapi-path examples/petstore.json"
 Sleep 2s
 Enter
-Sleep 1s
-Down@1s 4
+Sleep 3s
 Enter
-Sleep 1s
-Up@500ms 2
+Down@2s 9
 Enter
-Sleep 1s
-Right
+Sleep 2s
 Down@1s 3
 Enter
 Sleep 1s
-Left
-Down@1s 4
+Right@1s
+Down@2s
 Enter
-Right@500ms 6
-Sleep 4s
+Sleep 1s
+Left@1s
+Down@2s
+Enter
+Right@2s 3
+Down@2s 10
+Right@1s 2
+Sleep 10s
 Type "q"
-Sleep 500ms
+Sleep 1s
 Ctrl+D
 

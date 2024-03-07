@@ -92,8 +92,9 @@ impl Pane for AddressPane {
         String::from("http://localhost")
       };
       let title = operation.summary.clone().unwrap_or_default();
-      let inner_margin = Margin { horizontal: 2, vertical: 2 };
-      let inner = area.inner(&inner_margin);
+      const INNER_MARGIN: Margin = Margin { horizontal: 1, vertical: 1 };
+
+      let inner = area.inner(&INNER_MARGIN);
       frame.render_widget(
         Paragraph::new(Line::from(vec![
           Span::styled(format!("{:7}", method.as_str()), Style::default().fg(Self::method_color(method.as_str()))),
