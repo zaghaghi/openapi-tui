@@ -175,12 +175,11 @@ impl Pane for RequestPane {
     let inner = area.inner(&inner_margin);
 
     frame.render_widget(
-      Tabs::new(self.request_schema_content_keys.clone())
-        .style(Style::default().dark_gray())
-        .highlight_style(Style::default().white().add_modifier(Modifier::BOLD | Modifier::UNDERLINED))
-        .select(self.request_schema_content_keys_index)
-        .divider(symbols::DOT)
-        .padding(" ", " "),
+      Tabs::new(
+        self.request_schema_content_keys.iter().map(|item| Span::styled(format!("[{}]", item), Style::default()).dim()),
+      )
+      .highlight_style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED).not_dim())
+      .select(self.request_schema_content_keys_index),
       inner,
     );
 

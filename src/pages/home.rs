@@ -70,7 +70,7 @@ impl Home {
         Box::new(TagsPane::new(state.clone(), false, focused_border_style)),
         Box::new(AddressPane::new(state.clone(), false, focused_border_style)),
         Box::new(RequestPane::new(state.clone(), false, focused_border_style)),
-        Box::new(ResponsePane::new(false, focused_border_style)),
+        Box::new(ResponsePane::new(state.clone(), false, focused_border_style)),
       ],
       focused_pane_index: 0,
       state,
