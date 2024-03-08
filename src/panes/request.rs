@@ -28,7 +28,7 @@ pub struct RequestPane {
   state: Arc<RwLock<State>>,
   request_body: Option<RequestBody>,
   request_schema: Option<Schema>,
-  line_offset: u16,
+  request_schema_line_offset: Option<usize>,
   request_schema_styles: Vec<Vec<(Style, String)>>,
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
@@ -42,7 +42,7 @@ impl RequestPane {
       focused_border_style,
       request_body: None,
       request_schema: None,
-      line_offset: 0,
+      request_schema_line_offset: None,
       request_schema_styles: Vec::default(),
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
@@ -70,20 +70,24 @@ impl RequestPane {
   fn set_request_schema_styles(&mut self) -> Result<()> {
     if let Some(request_schema) = &self.request_schema {
       let yaml_schema = serde_yaml::to_string(&request_schema)?;
-
       let mut highlighter =
-        HighlightLines::new(self.yaml_syntax(), &self.highlighter_theme_set.themes["base16-ocean.dark"]);
-      for line in LinesWithEndings::from(yaml_schema.as_str()) {
-        let line_styles: Vec<(Style, String)> = highlighter
+        HighlightLines::new(self.yaml_syntax(), &self.highlighter_theme_set.themes["Solarized (dark)"]);
+      for (line_num, line) in LinesWithEndings::from(yaml_schema.as_str()).enumerate() {
+        let mut line_styles: Vec<(Style, String)> = highlighter
           .highlight_line(line, &self.highlighter_syntax_set)?
           .into_iter()
           .map(|segment| {
             (
-              syntect_tui::translate_style(segment.0).ok().unwrap_or_default().bg(Color::default()),
-              String::from(segment.1),
+              syntect_tui::translate_style(segment.0)
+                .ok()
+                .unwrap_or_default()
+                .underline_color(Color::Reset)
+                .bg(Color::Reset),
+              segment.1.to_string(),
             )
           })
           .collect();
+        line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num + 1)));
         self.request_schema_styles.push(line_styles);
       }
     }
@@ -95,6 +99,7 @@ impl RequestPane {
       let state = self.state.read().unwrap();
       self.request_body = None;
       self.request_schema_styles = vec![];
+      self.request_schema_line_offset = None;
       if let Some((_path, _method, operation)) = state.active_operation() {
         if let Some(oor) = &operation.request_body {
           let resolved_oor = oor.resolve(&state.openapi_spec)?;
@@ -105,7 +110,6 @@ impl RequestPane {
             self.request_schema = Some(request_schema);
           }
           self.request_body = Some(resolved_oor);
-          self.line_offset = 0;
         }
       }
     }
@@ -143,10 +147,13 @@ impl Pane for RequestPane {
         self.init_request_schema()?;
       },
       Action::Down => {
-        self.line_offset = self.line_offset.saturating_add(1);
+        self.request_schema_line_offset = match self.request_schema_line_offset {
+          Some(offset) => Some(offset.saturating_add(1).min(self.request_schema_styles.len() - 1)),
+          None => Some(0),
+        };
       },
       Action::Up => {
-        self.line_offset = self.line_offset.saturating_sub(1);
+        self.request_schema_line_offset = self.request_schema_line_offset.map(|offset| offset.saturating_sub(1));
       },
       Action::Submit => {},
       _ => {},
@@ -175,26 +182,24 @@ impl Pane for RequestPane {
       let inner_margin: Margin = Margin { horizontal: 2, vertical: 1 };
       let mut inner = inner.inner(&inner_margin);
       inner.height = inner.height.saturating_add(1);
-      let lines: Vec<Line> = self
-        .request_schema_styles
-        .iter()
-        .map(|items| {
-          return Line::from(
-            items
-              .iter()
-              .map(|item| {
-                return Span::styled(item.1.clone(), item.0);
-              })
-              .collect::<Vec<_>>(),
-          );
-        })
-        .collect();
-      frame.render_widget(
-        Paragraph::new(lines)
-          .style(Style::default().add_modifier(Modifier::ITALIC))
-          .wrap(Wrap { trim: false })
-          .scroll((self.line_offset, 0)),
+      let lines = self.request_schema_styles.iter().map(|items| {
+        return Line::from(
+          items
+            .iter()
+            .map(|item| {
+              return Span::styled(&item.1, item.0.bg(Color::Reset));
+            })
+            .collect::<Vec<_>>(),
+        );
+      });
+      let mut list_state = ListState::default().with_selected(self.request_schema_line_offset);
+
+      frame.render_stateful_widget(
+        List::new(lines)
+          .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
+          .highlight_spacing(HighlightSpacing::Always),
         inner,
+        &mut list_state,
       );
     }
     frame.render_widget(
