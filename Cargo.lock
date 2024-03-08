@@ -2298,8 +2298,9 @@ dependencies = [
 
 [[package]]
 name = "syntect-tui"
-version = "3.0.1"
-source = "git+https://github.com/zaghaghi/syntect-tui.git?branch=main#44dc42569ed6695643d30f8fa815f9f511d927c2"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02fe7196edbbbaf93d08b52e8b5ae8cc45cf794d78fb0d3e1391a3183659794f"
 dependencies = [
  "custom_error",
  "ratatui",

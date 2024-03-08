@@ -35,9 +35,15 @@ Down@2s
 Enter
 Right@2s 3
 Down@1s 14
+Type "2"
+Sleep 1s
+Type "3"
+Sleep 3s
 Right@1s 2
 Sleep 10s
-Type "q"
-Sleep 1s
-Ctrl+D
+Hide
+    Type "q"
+    Sleep 1s
+    Ctrl+D
+Show
 

@@ -140,6 +140,7 @@ impl Page for Home {
       KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
       KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
       KeyCode::Enter => EventResponse::Stop(Action::Submit),
+      KeyCode::Char(c) if ('1'..='9').contains(&c) => EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1)),
       _ => {
         return Ok(None);
       },

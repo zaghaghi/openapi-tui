@@ -18,4 +18,5 @@ pub enum Action {
   Down,
   Submit,
   Update,
+  Tab(u32),
 }
