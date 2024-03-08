@@ -77,25 +77,25 @@ impl Pane for ApisPane {
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
       Action::Down => {
-        let state = self.state.read().unwrap();
+        let mut state = self.state.write().unwrap();
         let operations_len = state.operations_len();
         if operations_len > 0 {
           self.current_operation_index = self.current_operation_index.saturating_add(1) % operations_len;
         }
+        state.active_operation_index = self.current_operation_index;
+        return Ok(Some(Action::Update));
       },
       Action::Up => {
-        let state = self.state.read().unwrap();
+        let mut state = self.state.write().unwrap();
         let operations_len = state.operations_len();
         if operations_len > 0 {
           self.current_operation_index =
             self.current_operation_index.saturating_add(operations_len - 1) % operations_len;
         }
-      },
-      Action::Submit => {
-        let mut state = self.state.write().unwrap();
         state.active_operation_index = self.current_operation_index;
         return Ok(Some(Action::Update));
       },
+      Action::Submit => {},
       Action::Update => {
         let state = self.state.read().unwrap();
         self.current_operation_index = state.active_operation_index;
@@ -117,7 +117,7 @@ impl Pane for ApisPane {
       }
       Some(Line::from(vec![
         Span::styled(
-          format!("{:7}", operation.1.as_str()),
+          format!(" {:7}", operation.1.as_str()),
           Style::default().fg(Self::method_color(operation.1.as_str())),
         ),
         Span::styled(
@@ -128,9 +128,10 @@ impl Pane for ApisPane {
     });
 
     let list = List::new(items)
-      .block(Block::default().title("List").borders(Borders::ALL))
-      .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::DarkGray))
-      .direction(ListDirection::TopToBottom);
+      .block(Block::default().borders(Borders::ALL))
+      .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
+      .highlight_spacing(HighlightSpacing::Always)
+      .highlight_style(Style::default().add_modifier(Modifier::BOLD));
     let mut list_state = ListState::default().with_selected(Some(self.current_operation_index));
 
     frame.render_stateful_widget(list, area, &mut list_state);

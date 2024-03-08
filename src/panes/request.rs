@@ -28,7 +28,7 @@ pub struct RequestPane {
   state: Arc<RwLock<State>>,
   request_body: Option<RequestBody>,
   request_schema: Option<Schema>,
-  request_schema_line_offset: Option<usize>,
+  request_schema_line_offset: usize,
   request_schema_styles: Vec<Vec<(Style, String)>>,
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
@@ -42,7 +42,7 @@ impl RequestPane {
       focused_border_style,
       request_body: None,
       request_schema: None,
-      request_schema_line_offset: None,
+      request_schema_line_offset: 0,
       request_schema_styles: Vec::default(),
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
@@ -99,7 +99,7 @@ impl RequestPane {
       let state = self.state.read().unwrap();
       self.request_body = None;
       self.request_schema_styles = vec![];
-      self.request_schema_line_offset = None;
+      self.request_schema_line_offset = 0;
       if let Some((_path, _method, operation)) = state.active_operation() {
         if let Some(oor) = &operation.request_body {
           let resolved_oor = oor.resolve(&state.openapi_spec)?;
@@ -147,13 +147,11 @@ impl Pane for RequestPane {
         self.init_request_schema()?;
       },
       Action::Down => {
-        self.request_schema_line_offset = match self.request_schema_line_offset {
-          Some(offset) => Some(offset.saturating_add(1).min(self.request_schema_styles.len() - 1)),
-          None => Some(0),
-        };
+        self.request_schema_line_offset =
+          self.request_schema_line_offset.saturating_add(1).min(self.request_schema_styles.len() - 1);
       },
       Action::Up => {
-        self.request_schema_line_offset = self.request_schema_line_offset.map(|offset| offset.saturating_sub(1));
+        self.request_schema_line_offset = self.request_schema_line_offset.saturating_sub(1);
       },
       Action::Submit => {},
       _ => {},
@@ -179,7 +177,7 @@ impl Pane for RequestPane {
         inner,
       );
 
-      let inner_margin: Margin = Margin { horizontal: 2, vertical: 1 };
+      let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
       let mut inner = inner.inner(&inner_margin);
       inner.height = inner.height.saturating_add(1);
       let lines = self.request_schema_styles.iter().map(|items| {
@@ -192,7 +190,7 @@ impl Pane for RequestPane {
             .collect::<Vec<_>>(),
         );
       });
-      let mut list_state = ListState::default().with_selected(self.request_schema_line_offset);
+      let mut list_state = ListState::default().with_selected(Some(self.request_schema_line_offset));
 
       frame.render_stateful_widget(
         List::new(lines)
