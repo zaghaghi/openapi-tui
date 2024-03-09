@@ -14,36 +14,28 @@ Hide
 
     Set Theme "Catppuccin Mocha"
     Type "cargo run -q -- --openapi-path examples/petstore.json"
-
     Enter
-    Sleep 3s
+    Sleep 10s
 Show
-Sleep 3s
-Enter
+Sleep 1s
 Down@2s 9
-Enter
-Sleep 2s
+Sleep 1s
 Down@1s 3
-Enter
-Sleep 1s
-Right@1s
-Down@2s
-Enter
-Sleep 1s
-Left@1s
-Down@2s
-Enter
-Right@2s 3
-Down@1s 14
+Right@500ms
+Down@500ms
+Sleep 500ms
+Left
+Down@1s
+Right@1s 3
+Down@500ms 14
 Type "2"
-Sleep 1s
+Sleep 500ms
 Type "3"
-Sleep 3s
-Right@1s 2
-Sleep 10s
+Sleep 1s
+Right@500ms 2
+Sleep 1s
 Hide
     Type "q"
-    Sleep 1s
     Ctrl+D
 Show
 
