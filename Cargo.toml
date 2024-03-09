@@ -9,7 +9,7 @@ build = "build.rs"
 authors = ["Hamed Zaghaghi <hamed.zaghaghi@gmail.com>"]
 repository = "https://github.com/zaghaghi/openapi-tui"
 homepage = "https://github.com/zaghaghi/openapi-tui"
-license = "MIT License"
+license = "MIT"
 readme = "README.md"
 
 [dependencies]
