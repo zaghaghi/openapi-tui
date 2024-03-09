@@ -32,10 +32,12 @@ pub struct ResponsePane {
   focused: bool,
   focused_border_style: Style,
   state: Arc<RwLock<State>>,
+
   response_schemas: Vec<ResponseType>,
   response_schemas_index: usize,
   response_schemas_styles: Vec<Vec<(Style, String)>>,
   response_schema_line_offset: usize,
+
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
 }
