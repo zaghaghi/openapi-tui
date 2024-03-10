@@ -65,6 +65,10 @@ impl Pane for AddressPane {
     Ok(())
   }
 
+  fn height_constraint(&self) -> Constraint {
+    Constraint::Max(3)
+  }
+
   fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
     Ok(None)
   }

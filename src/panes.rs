@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Rect};
 
 use crate::{
   action::Action,
@@ -9,7 +9,6 @@ use crate::{
 
 pub mod address;
 pub mod apis;
-pub mod profiles;
 pub mod request;
 pub mod response;
 pub mod tags;
@@ -26,6 +25,8 @@ pub trait Pane {
   fn unfocus(&mut self) -> Result<()> {
     Ok(())
   }
+
+  fn height_constraint(&self) -> Constraint;
 
   #[allow(unused_variables)]
   fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
