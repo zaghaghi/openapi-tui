@@ -155,8 +155,15 @@ impl Page for Home {
       .direction(Direction::Vertical)
       .constraints(vec![Constraint::Fill(1), Constraint::Max(1)])
       .split(area);
-
-    frame.render_widget(Line::default().style(Style::default().bg(Color::DarkGray)), verical_layout[1]);
+    const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+    const DIVIDER: &str = "|";
+    frame.render_widget(
+      Line::from(
+        format!("l/h {ARROW} Next/Prev Pane {DIVIDER} j/k {ARROW} Next/Prev Item {DIVIDER} 1-9 {ARROW} Select Tab {DIVIDER} g/b {ARROW} Go/Back definitions {DIVIDER} q {ARROW} Quit")
+      )
+      .style(Style::default().fg(Color::DarkGray)),
+      verical_layout[1],
+    );
 
     let outer_layout = Layout::default()
       .direction(Direction::Horizontal)
