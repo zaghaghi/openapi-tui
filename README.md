@@ -49,6 +49,6 @@ Options:
 - [ ] Remote API specification
 - [ ] Pane Fullscreen Mode
 - [X] Nested Components
-- [ ] Status Line
+- [X] Status Line
 - [ ] Command Line
 - [ ] Execute 

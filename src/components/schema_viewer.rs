@@ -52,6 +52,13 @@ impl SchemaViewer {
     ))
   }
 
+  pub fn clear(&mut self) {
+    self.line_offset = 0;
+    self.name_history = vec![];
+    self.line_offset_history = vec![];
+    self.styles = vec![];
+  }
+
   pub fn set(&mut self, schema: Schema) -> Result<()> {
     self.line_offset = 0;
     self.name_history = vec![];

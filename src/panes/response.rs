@@ -110,6 +110,8 @@ impl ResponsePane {
     }
     if let Some(response_type) = self.schemas.get(self.schemas_index) {
       self.schema_viewer.set(response_type.schema.clone())?;
+    } else {
+      self.schema_viewer.clear();
     }
     Ok(())
   }
@@ -129,6 +131,17 @@ impl Pane for ResponsePane {
   fn unfocus(&mut self) -> Result<()> {
     self.focused = false;
     Ok(())
+  }
+
+  fn height_constraint(&self) -> Constraint {
+    if self.schemas.get(self.schemas_index).is_none() {
+      return Constraint::Max(2);
+    }
+
+    match self.focused {
+      true => Constraint::Fill(3),
+      false => Constraint::Fill(1),
+    }
   }
 
   fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {

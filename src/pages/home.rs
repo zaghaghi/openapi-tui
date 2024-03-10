@@ -151,19 +151,36 @@ impl Page for Home {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
+    let verical_layout = Layout::default()
+      .direction(Direction::Vertical)
+      .constraints(vec![Constraint::Fill(1), Constraint::Max(1)])
+      .split(area);
+    const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+    frame.render_widget(
+      Line::from(vec![
+        Span::styled(format!("[l/h {ARROW} next/prev pane] [j/k {ARROW} next/prev item] [1-9 {ARROW} select tab] [g/b {ARROW} go/back definitions] [q {ARROW} quit]"), Style::default()),
+      ])
+      .style(Style::default().fg(Color::DarkGray)),
+      verical_layout[1],
+    );
+
     let outer_layout = Layout::default()
       .direction(Direction::Horizontal)
       .constraints(vec![Constraint::Min(30), Constraint::Percentage(100)])
-      .split(area);
+      .split(verical_layout[0]);
 
     let left_panes = Layout::default()
       .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Fill(3), Constraint::Fill(1)])
+      .constraints(vec![self.panes[0].height_constraint(), self.panes[1].height_constraint()])
       .split(outer_layout[0]);
 
     let right_panes = Layout::default()
       .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(3), Constraint::Fill(1), Constraint::Fill(1)])
+      .constraints(vec![
+        self.panes[2].height_constraint(),
+        self.panes[3].height_constraint(),
+        self.panes[4].height_constraint(),
+      ])
       .split(outer_layout[1]);
 
     self.panes[0].draw(frame, left_panes[0])?;
