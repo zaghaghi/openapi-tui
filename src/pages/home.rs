@@ -166,7 +166,7 @@ impl Page for Home {
 
     let outer_layout = Layout::default()
       .direction(Direction::Horizontal)
-      .constraints(vec![Constraint::Min(30), Constraint::Percentage(100)])
+      .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
       .split(verical_layout[0]);
 
     let left_panes = Layout::default()

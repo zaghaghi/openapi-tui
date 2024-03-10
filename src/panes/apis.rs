@@ -122,15 +122,10 @@ impl Pane for ApisPane {
           return None;
         }
       }
+      let (path, method, operation) = operation;
       Some(Line::from(vec![
-        Span::styled(
-          format!(" {:7}", operation.1.as_str()),
-          Style::default().fg(Self::method_color(operation.1.as_str())),
-        ),
-        Span::styled(
-          operation.2.summary.as_ref().unwrap_or(operation.2.operation_id.as_ref().unwrap_or(&unknown)),
-          Style::default().fg(Color::White),
-        ),
+        Span::styled(format!(" {:7}", method.as_str()), Self::method_color(method.as_str())),
+        Span::styled(format!(" {:7}", path), Color::White),
       ]))
     });
 
