@@ -121,17 +121,31 @@ impl RequestPane {
   }
 
   fn legend_line(&self) -> Line {
-    Line::from(vec![
-      Span::raw("[ "),
-      Span::styled("Body".to_string(), self.location_color("body")),
-      Span::raw(format!(" {} ", symbols::DOT)),
-      Span::styled("Path".to_string(), self.location_color("path")),
-      Span::raw(format!(" {} ", symbols::DOT)),
-      Span::styled("Query".to_string(), self.location_color("query")),
-      Span::raw(format!(" {} ", symbols::DOT)),
-      Span::styled("Header".to_string(), self.location_color("header")),
-      Span::raw(" ]"),
-    ])
+    if self.schema_viewer.schema_path().is_empty() {
+      Line::from(vec![
+        Span::raw("["),
+        Span::styled("Body".to_string(), self.location_color("body")),
+        Span::raw("/"),
+        Span::styled("Path".to_string(), self.location_color("path")),
+        Span::raw("/"),
+        Span::styled("Query".to_string(), self.location_color("query")),
+        Span::raw("/"),
+        Span::styled("Header".to_string(), self.location_color("header")),
+        Span::raw("]"),
+      ])
+    } else {
+      Line::from(vec![
+        Span::raw("["),
+        Span::styled("B".to_string(), self.location_color("body")),
+        Span::raw("/"),
+        Span::styled("P".to_string(), self.location_color("path")),
+        Span::raw("/"),
+        Span::styled("Q".to_string(), self.location_color("query")),
+        Span::raw("/"),
+        Span::styled("H".to_string(), self.location_color("header")),
+        Span::raw("]"),
+      ])
+    }
   }
 
   fn nested_schema_path_line(&self) -> Line {
@@ -228,7 +242,7 @@ impl Pane for RequestPane {
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type())
-        .title(self.legend_line().right_aligned())
+        .title_bottom(self.legend_line().style(Style::default().dim()).right_aligned())
         .title_bottom(
           self
             .nested_schema_path_line()
