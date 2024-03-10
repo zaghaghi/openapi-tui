@@ -156,11 +156,10 @@ impl Page for Home {
       .constraints(vec![Constraint::Fill(1), Constraint::Max(1)])
       .split(area);
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    const DIVIDER: &str = "|";
     frame.render_widget(
-      Line::from(
-        format!("l/h {ARROW} Next/Prev Pane {DIVIDER} j/k {ARROW} Next/Prev Item {DIVIDER} 1-9 {ARROW} Select Tab {DIVIDER} g/b {ARROW} Go/Back definitions {DIVIDER} q {ARROW} Quit")
-      )
+      Line::from(vec![
+        Span::styled(format!("[l/h {ARROW} next/prev pane] [j/k {ARROW} next/prev item] [1-9 {ARROW} select tab] [g/b {ARROW} go/back definitions] [q {ARROW} quit]"), Style::default()),
+      ])
       .style(Style::default().fg(Color::DarkGray)),
       verical_layout[1],
     );

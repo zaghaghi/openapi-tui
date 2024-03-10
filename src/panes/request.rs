@@ -116,6 +116,8 @@ impl RequestPane {
     }
     if let Some(request_type) = self.schemas.get(self.schemas_index) {
       self.schema_viewer.set(request_type.schema.clone())?;
+    } else {
+      self.schema_viewer.clear();
     }
     Ok(())
   }
@@ -177,6 +179,9 @@ impl Pane for RequestPane {
   }
 
   fn height_constraint(&self) -> Constraint {
+    if self.schemas.get(self.schemas_index).is_none() {
+      return Constraint::Max(2);
+    }
     match self.focused {
       true => Constraint::Fill(3),
       false => Constraint::Fill(1),
