@@ -1,3 +1,4 @@
+![logo](static/logo.png)
 # openapi-tui
 
 [![CI](https://github.com/zaghaghi/openapi-tui/workflows/CI/badge.svg)](https://github.com/zaghaghi/openapi-tui/actions)
