@@ -19,4 +19,6 @@ pub enum Action {
   Submit,
   Update,
   Tab(u32),
+  Go,
+  Back,
 }

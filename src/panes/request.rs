@@ -7,15 +7,10 @@ use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
-use syntect::{
-  easy::HighlightLines,
-  highlighting::ThemeSet,
-  parsing::{SyntaxReference, SyntaxSet},
-  util::LinesWithEndings,
-};
 
 use crate::{
   action::Action,
+  components::schema_viewer::SchemaViewer,
   pages::home::State,
   panes::Pane,
   tui::{EventResponse, Frame},
@@ -34,32 +29,21 @@ pub struct RequestPane {
   focused_border_style: Style,
   state: Arc<RwLock<State>>,
 
-  request_schemas: Vec<RequestType>,
-  request_schemas_index: usize,
-  request_schemas_styles: Vec<Vec<(Style, String)>>,
-  request_schema_line_offset: usize,
-
-  highlighter_syntax_set: SyntaxSet,
-  highlighter_theme_set: ThemeSet,
+  schemas: Vec<RequestType>,
+  schemas_index: usize,
+  schema_viewer: SchemaViewer,
 }
 
 impl RequestPane {
   pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
     Self {
-      state,
       focused,
       focused_border_style,
-      request_schemas: Vec::default(),
-      request_schemas_index: 0,
-      request_schemas_styles: Vec::default(),
-      request_schema_line_offset: 0,
-      highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
-      highlighter_theme_set: ThemeSet::load_defaults(),
+      schemas: Vec::default(),
+      schemas_index: 0,
+      schema_viewer: SchemaViewer::from(state.clone()),
+      state,
     }
-  }
-
-  fn yaml_syntax(&self) -> &SyntaxReference {
-    return self.highlighter_syntax_set.find_syntax_by_extension("yaml").unwrap();
   }
 
   fn border_style(&self) -> Style {
@@ -92,43 +76,13 @@ impl RequestPane {
     Color::default()
   }
 
-  fn set_request_schema_styles(&mut self) -> Result<()> {
-    self.request_schemas_styles = Vec::default();
-    if let Some(request_type) = self.request_schemas.get(self.request_schemas_index) {
-      let yaml_schema = serde_yaml::to_string(&request_type.schema)?;
-      let mut highlighter =
-        HighlightLines::new(self.yaml_syntax(), &self.highlighter_theme_set.themes["Solarized (dark)"]);
-      for (line_num, line) in LinesWithEndings::from(yaml_schema.as_str()).enumerate() {
-        let mut line_styles: Vec<(Style, String)> = highlighter
-          .highlight_line(line, &self.highlighter_syntax_set)?
-          .into_iter()
-          .map(|segment| {
-            (
-              syntect_tui::translate_style(segment.0)
-                .ok()
-                .unwrap_or_default()
-                .underline_color(Color::Reset)
-                .bg(Color::Reset),
-              segment.1.to_string(),
-            )
-          })
-          .collect();
-        line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num + 1)));
-        self.request_schemas_styles.push(line_styles);
-      }
-    }
-    Ok(())
-  }
-
-  fn init_request_schema(&mut self) -> Result<()> {
+  fn init_schema(&mut self) -> Result<()> {
     {
-      self.request_schemas_styles = vec![];
-      self.request_schema_line_offset = 0;
       let state = self.state.read().unwrap();
       if let Some((_path, _method, operation)) = state.active_operation() {
-        let mut request_schemas: Vec<RequestType> = vec![];
+        let mut schemas: Vec<RequestType> = vec![];
         if let Some(request_body) = &operation.request_body {
-          request_schemas = request_body
+          schemas = request_body
             .resolve(&state.openapi_spec)
             .unwrap_or(RequestBody::default())
             .content
@@ -145,7 +99,7 @@ impl RequestPane {
             })
             .collect();
         }
-        request_schemas.extend(
+        schemas.extend(
           operation.parameters.iter().filter_map(|parameter| parameter.resolve(&state.openapi_spec).ok()).map(
             |parameter| {
               RequestType {
@@ -157,14 +111,16 @@ impl RequestPane {
             },
           ),
         );
-        self.request_schemas = request_schemas;
+        self.schemas = schemas;
       }
     }
-    self.set_request_schema_styles()?;
+    if let Some(request_type) = self.schemas.get(self.schemas_index) {
+      self.schema_viewer.set(request_type.schema.clone())?;
+    }
     Ok(())
   }
 
-  fn legend_line(&mut self) -> Line<'_> {
+  fn legend_line(&self) -> Line {
     Line::from(vec![
       Span::raw("[ "),
       Span::styled("Body".to_string(), self.location_color("body")),
@@ -177,10 +133,22 @@ impl RequestPane {
       Span::raw(" ]"),
     ])
   }
+
+  fn nested_schema_path_line(&self) -> Line {
+    let schema_path = self.schema_viewer.schema_path();
+    if schema_path.is_empty() {
+      return Line::default();
+    }
+    let mut line = String::from("[ ");
+    line.push_str(&schema_path.join(" > "));
+    line.push_str(" ]");
+    Line::from(line)
+  }
 }
+
 impl Pane for RequestPane {
   fn init(&mut self) -> Result<()> {
-    self.init_request_schema()?;
+    self.init_schema()?;
     Ok(())
   }
 
@@ -206,21 +174,25 @@ impl Pane for RequestPane {
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
       Action::Update => {
-        self.request_schemas_index = 0;
-        self.init_request_schema()?;
+        self.schemas_index = 0;
+        self.init_schema()?;
       },
       Action::Down => {
-        self.request_schema_line_offset =
-          self.request_schema_line_offset.saturating_add(1).min(self.request_schemas_styles.len() - 1);
+        self.schema_viewer.down();
       },
       Action::Up => {
-        self.request_schema_line_offset = self.request_schema_line_offset.saturating_sub(1);
+        self.schema_viewer.up();
       },
-      Action::Tab(index) if index < self.request_schemas.len().try_into()? => {
-        self.request_schemas_index = index.try_into()?;
-        self.init_request_schema()?;
+      Action::Tab(index) if index < self.schemas.len().try_into()? => {
+        self.schemas_index = index.try_into()?;
+        self.init_schema()?;
       },
-      Action::Submit => {},
+      Action::Go => self.schema_viewer.go()?,
+      Action::Back => {
+        if let Some(request_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.back(request_type.schema.clone())?;
+        }
+      },
       _ => {},
     }
 
@@ -233,7 +205,7 @@ impl Pane for RequestPane {
     let inner = area.inner(&inner_margin);
 
     frame.render_widget(
-      Tabs::new(self.request_schemas.iter().map(|item| {
+      Tabs::new(self.schemas.iter().map(|item| {
         let mut title = item.title.clone();
         if !item.media_type.is_empty() {
           title.push_str(format!(" [{}]", item.media_type).as_str());
@@ -241,30 +213,14 @@ impl Pane for RequestPane {
         Span::styled(title, Style::default().fg(self.location_color(item.location.as_str()))).dim()
       }))
       .highlight_style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED).not_dim())
-      .select(self.request_schemas_index),
+      .select(self.schemas_index),
       inner,
     );
 
     let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
     let mut inner = inner.inner(&inner_margin);
     inner.height = inner.height.saturating_add(1);
-    let lines = self.request_schemas_styles.iter().map(|items| {
-      return Line::from(
-        items
-          .iter()
-          .map(|item| {
-            return Span::styled(&item.1, item.0.bg(Color::Reset));
-          })
-          .collect::<Vec<_>>(),
-      );
-    });
-    let mut list_state = ListState::default().with_selected(Some(self.request_schema_line_offset));
-
-    frame.render_stateful_widget(
-      List::new(lines).highlight_symbol(symbols::scrollbar::HORIZONTAL.end).highlight_spacing(HighlightSpacing::Always),
-      inner,
-      &mut list_state,
-    );
+    self.schema_viewer.render_widget(frame, inner);
 
     frame.render_widget(
       Block::default()
@@ -272,7 +228,13 @@ impl Pane for RequestPane {
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type())
-        .title_bottom(self.legend_line().right_aligned()),
+        .title(self.legend_line().right_aligned())
+        .title_bottom(
+          self
+            .nested_schema_path_line()
+            .style(Style::default().fg(Color::White).dim().add_modifier(Modifier::ITALIC))
+            .left_aligned(),
+        ),
       area,
     );
 
