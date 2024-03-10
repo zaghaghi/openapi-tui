@@ -5,7 +5,10 @@
 Terminal UI to list, browse and run APIs defined with openapi spec.
 
 # Demo
-![alt text](static/demo.gif)
+![demo](static/demo.gif)
+
+## Nested Comopnents
+![nested-refrences](static/nested-refs.gif)
 
 # Installation
 Install from source:
@@ -28,11 +31,24 @@ Options:
   -V, --version              Print version
 ```
 
+# Keybindings
+
+| Key | Action|
+|:----|:-----|
+| `→`, `l`| Move to next pane |
+| `←`, `h` | Move to previous pane |
+| `↓`, `j` | Move down in lists |
+| `↑`, `k` | Move up in lists |
+| `1...9` | Move between tabs |
+| `g` | Go in nested items in lists|
+| `Backspace`, `b` | Get out of nested items in lists|
+
+
 # Milestones
-- [ ] Viewer
+- [X] Viewer
 - [ ] Remote API specification
 - [ ] Pane Fullscreen Mode
-- [ ] Nested Components
+- [X] Nested Components
 - [ ] Status Line
 - [ ] Command Line
 - [ ] Execute 
