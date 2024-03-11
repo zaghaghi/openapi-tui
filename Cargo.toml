@@ -1,6 +1,6 @@
 [package]
 name = "openapi-tui"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "This TUI allows you to list and browse APIs described by the openapi specification."
 
@@ -42,8 +42,6 @@ tokio-util = "0.7.9"
 tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "serde"] }
-tui-input = "0.8.0"
-tui-textarea = "0.4.0"
 
 [build-dependencies]
 vergen = { version = "8.2.6", features = [ "build", "git", "gitoxide", "cargo" ]}

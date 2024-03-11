@@ -1646,7 +1646,7 @@ dependencies = [
 
 [[package]]
 name = "openapi-tui"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "better-panic",
  "clap",
@@ -1677,8 +1677,6 @@ dependencies = [
  "tracing",
  "tracing-error",
  "tracing-subscriber",
- "tui-input",
- "tui-textarea",
  "vergen",
 ]
 
@@ -2563,27 +2561,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "tui-input"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e785f863a3af4c800a2a669d0b64c879b538738e352607e2624d03f868dc01"
-dependencies = [
- "crossterm",
- "unicode-width",
-]
-
-[[package]]
-name = "tui-textarea"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3e38ced1f941a9cfc923fbf2fe6858443c42cc5220bfd35bdd3648371e7bd8e"
-dependencies = [
- "crossterm",
- "ratatui",
- "unicode-width",
 ]
 
 [[package]]
