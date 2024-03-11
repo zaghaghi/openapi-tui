@@ -3,12 +3,12 @@
 
 [![CI](https://github.com/zaghaghi/openapi-tui/workflows/CI/badge.svg)](https://github.com/zaghaghi/openapi-tui/actions)
 
-Terminal UI to list, browse and run APIs defined with openapi spec.
+Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
 
 # Demo
 ![demo](static/demo.gif)
 
-## Nested Comopnents
+## Nested Components
 ![nested-refrences](static/nested-refs.gif)
 
 # Installation
@@ -64,6 +64,7 @@ Options:
 
 # Milestones
 - [X] Viewer
+- [ ] OpenAPI v3.1
 - [ ] Remote API specification
 - [ ] Pane Fullscreen Mode
 - [X] Nested Components
