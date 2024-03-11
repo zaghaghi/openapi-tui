@@ -85,7 +85,6 @@ impl App {
             tui::Event::Key(key) => {
               if let Some(keymap) = self.config.keybindings.get(&self.mode) {
                 if let Some(action) = keymap.get(&vec![key]) {
-                  log::info!("Got action: {action:?}");
                   action_tx.send(action.clone())?;
                 } else {
                   // If the key was not handled as a single key action,
@@ -94,7 +93,6 @@ impl App {
 
                   // Check for multi-key combinations
                   if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                    log::info!("Got action: {action:?}");
                     action_tx.send(action.clone())?;
                   }
                 }

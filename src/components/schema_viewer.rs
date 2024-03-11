@@ -97,7 +97,6 @@ impl SchemaViewer {
   }
 
   pub fn back(&mut self, schema: Schema) -> Result<()> {
-    log::info!("{:?}", self.line_offset_history);
     if let Some(line_offset) = self.line_offset_history.pop() {
       self.line_offset = line_offset;
     } else {

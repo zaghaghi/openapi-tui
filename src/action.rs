@@ -21,4 +21,5 @@ pub enum Action {
   Tab(u32),
   Go,
   Back,
+  ToggleFullScreen,
 }
