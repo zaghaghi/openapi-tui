@@ -53,6 +53,7 @@ pub struct Home {
   focused_pane_index: usize,
   #[allow(dead_code)]
   state: Arc<RwLock<State>>,
+  fullscreen_pane_index: Option<usize>,
 }
 
 impl Home {
@@ -74,6 +75,7 @@ impl Home {
       ],
       focused_pane_index: 0,
       state,
+      fullscreen_pane_index: None,
     })
   }
 }
@@ -124,6 +126,9 @@ impl Page for Home {
           pane.update(action.clone())?;
         }
       },
+      Action::ToggleFullScreen => {
+        self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
+      },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           return pane.update(action);
@@ -142,6 +147,7 @@ impl Page for Home {
       KeyCode::Char('g') | KeyCode::Char('G') => EventResponse::Stop(Action::Go),
       KeyCode::Backspace | KeyCode::Char('b') | KeyCode::Char('B') => EventResponse::Stop(Action::Back),
       KeyCode::Enter => EventResponse::Stop(Action::Submit),
+      KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
       KeyCode::Char(c) if ('1'..='9').contains(&c) => EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1)),
       _ => {
         return Ok(None);
@@ -164,30 +170,34 @@ impl Page for Home {
       verical_layout[1],
     );
 
-    let outer_layout = Layout::default()
-      .direction(Direction::Horizontal)
-      .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
-      .split(verical_layout[0]);
+    if let Some(fullscreen_pane_index) = self.fullscreen_pane_index {
+      self.panes[fullscreen_pane_index].draw(frame, verical_layout[0])?;
+    } else {
+      let outer_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
+        .split(verical_layout[0]);
 
-    let left_panes = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints(vec![self.panes[0].height_constraint(), self.panes[1].height_constraint()])
-      .split(outer_layout[0]);
+      let left_panes = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![self.panes[0].height_constraint(), self.panes[1].height_constraint()])
+        .split(outer_layout[0]);
 
-    let right_panes = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints(vec![
-        self.panes[2].height_constraint(),
-        self.panes[3].height_constraint(),
-        self.panes[4].height_constraint(),
-      ])
-      .split(outer_layout[1]);
+      let right_panes = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![
+          self.panes[2].height_constraint(),
+          self.panes[3].height_constraint(),
+          self.panes[4].height_constraint(),
+        ])
+        .split(outer_layout[1]);
 
-    self.panes[0].draw(frame, left_panes[0])?;
-    self.panes[1].draw(frame, left_panes[1])?;
-    self.panes[2].draw(frame, right_panes[0])?;
-    self.panes[3].draw(frame, right_panes[1])?;
-    self.panes[4].draw(frame, right_panes[2])?;
+      self.panes[0].draw(frame, left_panes[0])?;
+      self.panes[1].draw(frame, left_panes[1])?;
+      self.panes[2].draw(frame, right_panes[0])?;
+      self.panes[3].draw(frame, right_panes[1])?;
+      self.panes[4].draw(frame, right_panes[2])?;
+    }
     Ok(())
   }
 }
