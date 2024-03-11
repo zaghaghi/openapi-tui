@@ -8,7 +8,7 @@ Terminal UI to list, browse and run APIs defined with openapi spec.
 # Demo
 ![demo](static/demo.gif)
 
-## Nested Comopnents
+## Nested Components
 ![nested-refrences](static/nested-refs.gif)
 
 # Installation
