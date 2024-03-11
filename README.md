@@ -18,6 +18,23 @@ Install from source:
 ```
 Or download pre-built artifact from release page.
 
+## Distro Packages
+
+<details>
+  <summary>Packaging status</summary>
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/openapi-tui.svg)](https://repology.org/project/openapi-tui/versions)
+
+</details>
+
+### Arch Linux
+
+You can install using `pacman` as follows:
+
+```bash
+❯ pacman -S openapi-tui
+```
+
 # Usage
 ```bash
 ❯ openapi-tui --help
