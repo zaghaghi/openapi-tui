@@ -11,6 +11,9 @@ Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
 ## Nested Components
 ![nested-refrences](static/nested-refs.gif)
 
+## Fullscreen
+![fullscreen](static/fullscreen.gif)
+
 # Installation
 Install from source:
 ```bash
