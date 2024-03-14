@@ -17,7 +17,7 @@ pub struct Openapi {
   #[serde(rename = "jsonSchemaDialect", default, skip_serializing_if = "Option::is_none")]
   pub json_schema_dialect: Option<serde_json::Value>,
   #[serde(rename = "servers", default, skip_serializing_if = "Option::is_none")]
-  pub servers: Option<serde_json::Value>,
+  pub servers: Option<v31::Server>,
   #[serde(rename = "paths", skip_serializing_if = "std::collections::BTreeMap::is_empty")]
   pub paths: std::collections::BTreeMap<String, v31::ObjectOrRef<v31::PathItem>>,
   #[serde(rename = "webhooks", skip_serializing_if = "Option::is_none")]
