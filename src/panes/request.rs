@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
-use oas3::{spec::RequestBody, Schema};
+use openapi_31::v31::parameter::In;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
@@ -19,7 +19,8 @@ use crate::{
 pub struct RequestType {
   location: String,
   media_type: String,
-  schema: Schema,
+
+  schema: serde_json::Value,
   title: String,
 }
 
@@ -79,38 +80,41 @@ impl RequestPane {
   fn init_schema(&mut self) -> Result<()> {
     {
       let state = self.state.read().unwrap();
-      if let Some((_path, _method, operation)) = state.active_operation() {
+      if let Some(operation_item) = state.active_operation() {
         let mut schemas: Vec<RequestType> = vec![];
-        if let Some(request_body) = &operation.request_body {
+        if let Some(request_body) = &operation_item.operation.request_body {
           schemas = request_body
-            .resolve(&state.openapi_spec)
-            .unwrap_or(RequestBody::default())
+            .resolve()
+            .unwrap()
             .content
             .iter()
             .filter_map(|(media_type, media)| {
-              media.schema(&state.openapi_spec).map_or(None, |schema| {
+              media.schema.as_ref().map(|schema| {
                 Some(RequestType {
-                  location: String::from("body"),
-                  media_type: media_type.to_string(),
-                  title: schema.title.clone().unwrap_or("Body".to_string()),
-                  schema,
+                  location: "body".to_string(),
+                  media_type: media_type.clone(),
+                  title: "Body".to_string(),
+                  schema: schema.clone(),
                 })
               })
             })
+            .flatten()
             .collect();
         }
-        schemas.extend(
-          operation.parameters.iter().filter_map(|parameter| parameter.resolve(&state.openapi_spec).ok()).map(
-            |parameter| {
-              RequestType {
-                location: parameter.location,
-                media_type: parameter.param_type.unwrap_or_default(),
-                schema: parameter.schema.unwrap_or_default(),
-                title: parameter.name,
-              }
+        schemas.extend(operation_item.operation.parameters.iter().flatten().map(|parameter_or_ref| {
+          let parameter = parameter_or_ref.resolve().unwrap();
+          RequestType {
+            location: match parameter.r#in {
+              In::Query => "Query".to_string(),
+              In::Header => "Header".to_string(),
+              In::Path => "Path".to_string(),
+              In::Cookie => "Cookie".to_string(),
             },
-          ),
-        );
+            media_type: String::default(),
+            schema: parameter.schema.as_ref().unwrap().clone(),
+            title: parameter.name.clone(),
+          }
+        }));
         self.schemas = schemas;
       }
     }

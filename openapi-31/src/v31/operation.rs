@@ -21,11 +21,11 @@ pub struct Operation {
   #[serde(rename = "operationId", skip_serializing_if = "Option::is_none")]
   pub operation_id: Option<String>,
   #[serde(rename = "parameters", skip_serializing_if = "Option::is_none")]
-  pub parameters: Option<Vec<serde_json::Value>>,
+  pub parameters: Option<Vec<v31::ObjectOrRef<v31::Parameter>>>,
   #[serde(rename = "requestBody", default, skip_serializing_if = "Option::is_none")]
-  pub request_body: Option<serde_json::Value>,
+  pub request_body: Option<v31::ObjectOrRef<v31::RequestBody>>,
   #[serde(rename = "responses", skip_serializing_if = "Option::is_none")]
-  pub responses: Option<Box<v31::Responses>>,
+  pub responses: Option<std::collections::HashMap<String, v31::ObjectOrRef<v31::Response>>>,
   #[serde(rename = "callbacks", skip_serializing_if = "Option::is_none")]
   pub callbacks: Option<std::collections::HashMap<String, serde_json::Value>>,
   #[serde(rename = "deprecated", skip_serializing_if = "Option::is_none")]

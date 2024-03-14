@@ -15,5 +15,6 @@ serde = "1.0.197"
 serde_derive = "1.0.197"
 serde_with = "3.7.0"
 serde_json = "1.0.114"
+derive_more = "0.99.17"
 url = "2.5.0"
 uuid = { version = "1.7.0", features = ["serde", "v4"] }

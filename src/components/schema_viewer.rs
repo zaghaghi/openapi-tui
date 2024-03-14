@@ -1,10 +1,9 @@
 use std::{
-  collections::BTreeMap,
+  collections::HashMap,
   sync::{Arc, RwLock},
 };
 
 use color_eyre::eyre::Result;
-use oas3::Schema;
 use ratatui::{prelude::*, widgets::*};
 use syntect::{easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings};
 
@@ -14,7 +13,7 @@ const SYNTAX_THEME: &str = "Solarized (dark)";
 
 #[derive(Default)]
 pub struct SchemaViewer {
-  components: BTreeMap<String, Schema>,
+  components: HashMap<String, serde_json::Value>,
   styles: Vec<Vec<(Style, String)>>,
   line_offset: usize,
 
@@ -26,7 +25,7 @@ pub struct SchemaViewer {
 }
 
 impl SchemaViewer {
-  pub fn new(components: BTreeMap<String, Schema>) -> Self {
+  pub fn new(components: HashMap<String, serde_json::Value>) -> Self {
     Self {
       components,
       styles: Vec::default(),
@@ -40,16 +39,7 @@ impl SchemaViewer {
 
   pub fn from(state: Arc<RwLock<State>>) -> Self {
     let state_reader = state.read().unwrap();
-    Self::new(BTreeMap::from_iter(
-      state_reader
-        .openapi_spec
-        .components
-        .as_ref()
-        .unwrap()
-        .schemas
-        .iter()
-        .filter_map(|(key, value)| value.resolve(&state_reader.openapi_spec).ok().map(|schema| (key.clone(), schema))),
-    ))
+    Self::new(HashMap::from_iter(state_reader.openapi_spec.components.as_deref().unwrap().schemas.clone().unwrap()))
   }
 
   pub fn clear(&mut self) {
@@ -59,11 +49,12 @@ impl SchemaViewer {
     self.styles = vec![];
   }
 
-  pub fn set(&mut self, schema: Schema) -> Result<()> {
+  pub fn set(&mut self, schema: serde_json::Value) -> Result<()> {
     self.line_offset = 0;
     self.name_history = vec![];
     self.line_offset_history = vec![];
-    self.set_styles(schema)
+    self.set_styles(schema)?;
+    self.go()
   }
 
   pub fn go(&mut self) -> Result<()> {
@@ -96,7 +87,7 @@ impl SchemaViewer {
     }
   }
 
-  pub fn back(&mut self, schema: Schema) -> Result<()> {
+  pub fn back(&mut self, schema: serde_json::Value) -> Result<()> {
     if let Some(line_offset) = self.line_offset_history.pop() {
       self.line_offset = line_offset;
     } else {
@@ -116,7 +107,7 @@ impl SchemaViewer {
   }
 
   pub fn down(&mut self) {
-    self.line_offset = self.line_offset.saturating_add(1).min(self.styles.len() - 1);
+    self.line_offset = self.line_offset.saturating_add(1).min(self.styles.len().saturating_sub(1));
   }
 
   pub fn up(&mut self) {
@@ -147,7 +138,7 @@ impl SchemaViewer {
     );
   }
 
-  fn set_styles(&mut self, schema: Schema) -> Result<()> {
+  fn set_styles(&mut self, schema: serde_json::Value) -> Result<()> {
     self.styles = vec![];
     let yaml_schema = serde_yaml::to_string(&schema)?;
     let mut highlighter = HighlightLines::new(

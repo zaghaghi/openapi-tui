@@ -89,21 +89,25 @@ impl Pane for AddressPane {
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let state = self.state.read().unwrap();
-    if let Some((path, method, operation)) = state.active_operation() {
-      let base_url = if let Some(server) = state.openapi_spec.primary_server() {
-        server.to_owned().url
+    if let Some(operation_item) = state.active_operation() {
+      let base_url = if let Some(server) = operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None)
+      {
+        server.url.clone()
       } else {
         String::from("http://localhost")
       };
-      let title = operation.summary.clone().unwrap_or_default();
+      let title = operation_item.operation.summary.clone().unwrap_or_default();
       const INNER_MARGIN: Margin = Margin { horizontal: 1, vertical: 1 };
 
       let inner = area.inner(&INNER_MARGIN);
       frame.render_widget(
         Paragraph::new(Line::from(vec![
-          Span::styled(format!("{:7}", method.as_str()), Style::default().fg(Self::method_color(method.as_str()))),
+          Span::styled(
+            format!("{:7}", operation_item.method.as_str()),
+            Style::default().fg(Self::method_color(operation_item.method.as_str())),
+          ),
           Span::styled(base_url, Style::default().fg(Color::DarkGray)),
-          Span::styled(path, Style::default().fg(Color::White)),
+          Span::styled(&operation_item.path, Style::default().fg(Color::White)),
         ])),
         inner,
       );

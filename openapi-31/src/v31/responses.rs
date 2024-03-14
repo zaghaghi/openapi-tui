@@ -11,7 +11,7 @@ use crate::v31;
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Responses {
   #[serde(rename = "default", default, skip_serializing_if = "Option::is_none")]
-  pub default: Option<serde_json::Value>,
+  pub default: Option<v31::ObjectOrRef<v31::Response>>,
 }
 
 impl Responses {
