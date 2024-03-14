@@ -12,13 +12,8 @@ use crate::v31;
 pub struct SecurityScheme {
   #[serde(rename = "type", deserialize_with = "Option::deserialize")]
   pub r#type: Option<Type>,
-  #[serde(
-    rename = "description",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub description: Option<Option<serde_json::Value>>,
+  #[serde(rename = "description", default, skip_serializing_if = "Option::is_none")]
+  pub description: Option<serde_json::Value>,
 }
 
 impl SecurityScheme {

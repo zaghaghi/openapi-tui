@@ -22,13 +22,8 @@ pub struct Operation {
   pub operation_id: Option<String>,
   #[serde(rename = "parameters", skip_serializing_if = "Option::is_none")]
   pub parameters: Option<Vec<serde_json::Value>>,
-  #[serde(
-    rename = "requestBody",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub request_body: Option<Option<serde_json::Value>>,
+  #[serde(rename = "requestBody", default, skip_serializing_if = "Option::is_none")]
+  pub request_body: Option<serde_json::Value>,
   #[serde(rename = "responses", skip_serializing_if = "Option::is_none")]
   pub responses: Option<Box<v31::Responses>>,
   #[serde(rename = "callbacks", skip_serializing_if = "Option::is_none")]

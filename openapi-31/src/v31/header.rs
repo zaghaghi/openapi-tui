@@ -16,13 +16,8 @@ pub struct Header {
   pub required: Option<bool>,
   #[serde(rename = "deprecated", skip_serializing_if = "Option::is_none")]
   pub deprecated: Option<bool>,
-  #[serde(
-    rename = "schema",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub schema: Option<Option<serde_json::Value>>,
+  #[serde(rename = "schema", default, skip_serializing_if = "Option::is_none")]
+  pub schema: Option<serde_json::Value>,
   #[serde(rename = "content", skip_serializing_if = "Option::is_none")]
   pub content: Option<std::collections::HashMap<String, v31::MediaType>>,
 }

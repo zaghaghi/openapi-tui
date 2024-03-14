@@ -16,13 +16,8 @@ pub struct Link {
   pub operation_id: Option<String>,
   #[serde(rename = "parameters", skip_serializing_if = "Option::is_none")]
   pub parameters: Option<std::collections::HashMap<String, String>>,
-  #[serde(
-    rename = "requestBody",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub request_body: Option<Option<serde_json::Value>>,
+  #[serde(rename = "requestBody", default, skip_serializing_if = "Option::is_none")]
+  pub request_body: Option<serde_json::Value>,
   #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
   pub description: Option<String>,
   #[serde(rename = "body", skip_serializing_if = "Option::is_none")]

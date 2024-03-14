@@ -10,22 +10,12 @@ use crate::v31;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MediaType {
-  #[serde(
-    rename = "schema",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub schema: Option<Option<serde_json::Value>>,
+  #[serde(rename = "schema", default, skip_serializing_if = "Option::is_none")]
+  pub schema: Option<serde_json::Value>,
   #[serde(rename = "encoding", skip_serializing_if = "Option::is_none")]
   pub encoding: Option<std::collections::HashMap<String, v31::Encoding>>,
-  #[serde(
-    rename = "example",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub example: Option<Option<serde_json::Value>>,
+  #[serde(rename = "example", default, skip_serializing_if = "Option::is_none")]
+  pub example: Option<serde_json::Value>,
   #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
   pub examples: Option<std::collections::HashMap<String, serde_json::Value>>,
 }

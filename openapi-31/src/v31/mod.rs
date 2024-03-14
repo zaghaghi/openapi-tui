@@ -37,7 +37,7 @@ pub use self::parameter::Parameter;
 pub mod password;
 pub use self::password::Password;
 pub mod path_item;
-pub use self::path_item::PathItem;
+pub use self::path_item::{PathItem, PathItemOrRef};
 pub mod reference;
 pub use self::reference::Reference;
 pub mod request_body;

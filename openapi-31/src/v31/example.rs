@@ -14,13 +14,8 @@ pub struct Example {
   pub summary: Option<String>,
   #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
   pub description: Option<String>,
-  #[serde(
-    rename = "value",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub value: Option<Option<serde_json::Value>>,
+  #[serde(rename = "value", default, skip_serializing_if = "Option::is_none")]
+  pub value: Option<serde_json::Value>,
   #[serde(rename = "externalValue", skip_serializing_if = "Option::is_none")]
   pub external_value: Option<String>,
 }

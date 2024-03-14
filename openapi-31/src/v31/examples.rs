@@ -10,13 +10,8 @@ use crate::v31;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Examples {
-  #[serde(
-    rename = "example",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub example: Option<Option<serde_json::Value>>,
+  #[serde(rename = "example", default, skip_serializing_if = "Option::is_none")]
+  pub example: Option<serde_json::Value>,
   #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
   pub examples: Option<std::collections::HashMap<String, serde_json::Value>>,
 }

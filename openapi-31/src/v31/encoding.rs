@@ -10,36 +10,16 @@ use crate::v31;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Encoding {
-  #[serde(
-    rename = "contentType",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub content_type: Option<Option<serde_json::Value>>,
+  #[serde(rename = "contentType", default, skip_serializing_if = "Option::is_none")]
+  pub content_type: Option<serde_json::Value>,
   #[serde(rename = "headers", skip_serializing_if = "Option::is_none")]
   pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
-  #[serde(
-    rename = "style",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub style: Option<Option<Style>>,
-  #[serde(
-    rename = "explode",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub explode: Option<Option<serde_json::Value>>,
-  #[serde(
-    rename = "allowReserved",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub allow_reserved: Option<Option<serde_json::Value>>,
+  #[serde(rename = "style", default, skip_serializing_if = "Option::is_none")]
+  pub style: Option<Style>,
+  #[serde(rename = "explode", default, skip_serializing_if = "Option::is_none")]
+  pub explode: Option<serde_json::Value>,
+  #[serde(rename = "allowReserved", default, skip_serializing_if = "Option::is_none")]
+  pub allow_reserved: Option<serde_json::Value>,
 }
 
 impl Encoding {

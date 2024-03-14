@@ -10,13 +10,8 @@ use crate::v31;
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Responses {
-  #[serde(
-    rename = "default",
-    default,
-    with = "::serde_with::rust::double_option",
-    skip_serializing_if = "Option::is_none"
-  )]
-  pub default: Option<Option<serde_json::Value>>,
+  #[serde(rename = "default", default, skip_serializing_if = "Option::is_none")]
+  pub default: Option<serde_json::Value>,
 }
 
 impl Responses {
