@@ -1,8 +1,11 @@
-use std::sync::{Arc, RwLock};
+use std::{
+  fs::File,
+  sync::{Arc, RwLock},
+};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use oas3::{spec::Operation, Spec};
+use openapi_31::v31::{Openapi, Operation};
 use ratatui::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -14,33 +17,45 @@ use crate::{
   tui::EventResponse,
 };
 
+pub struct OperationItem {
+  pub path: String,
+  pub method: String,
+  pub operation: Operation,
+}
+
+impl OperationItem {
+  pub fn has_tag(&self, tag: &String) -> bool {
+    self.operation.tags.as_ref().map_or(false, |tags| tags.contains(tag))
+  }
+}
+
 #[derive(Default)]
 pub struct State {
   pub openapi_path: String,
-  pub openapi_spec: Spec,
+  pub openapi_spec: Openapi,
+  pub openapi_operations: Vec<OperationItem>,
   pub active_operation_index: usize,
   pub active_tag_name: Option<String>,
 }
 
 impl State {
-  pub fn active_operation(&self) -> Option<(String, String, &Operation)> {
+  pub fn active_operation(&self) -> Option<&OperationItem> {
     if let Some(active_tag) = &self.active_tag_name {
-      if let Some((path, method, operation)) =
-        self.openapi_spec.operations().filter(|item| item.2.tags.contains(active_tag)).nth(self.active_operation_index)
-      {
-        return Some((path, method.to_string(), operation));
-      }
-    } else if let Some((path, method, operation)) = self.openapi_spec.operations().nth(self.active_operation_index) {
-      return Some((path, method.to_string(), operation));
+      self
+        .openapi_operations
+        .iter()
+        .filter(|flat_operation| flat_operation.has_tag(active_tag))
+        .nth(self.active_operation_index)
+    } else {
+      self.openapi_operations.get(self.active_operation_index)
     }
-    None
   }
 
   pub fn operations_len(&self) -> usize {
     if let Some(active_tag) = &self.active_tag_name {
-      self.openapi_spec.operations().filter(|item| item.2.tags.contains(active_tag)).count()
+      self.openapi_operations.iter().filter(|item| item.has_tag(active_tag)).count()
     } else {
-      self.openapi_spec.operations().count()
+      self.openapi_operations.len()
     }
   }
 }
@@ -58,9 +73,18 @@ pub struct Home {
 
 impl Home {
   pub fn new(openapi_path: String) -> Result<Self> {
-    let openapi_spec = oas3::from_path(openapi_path.clone())?;
-    let state =
-      Arc::new(RwLock::new(State { openapi_spec, openapi_path, active_operation_index: 0, active_tag_name: None }));
+    let openapi_spec = serde_yaml::from_reader::<File, Openapi>(File::open(&openapi_path)?)?;
+    let openapi_operations = openapi_spec
+      .into_operations()
+      .map(|(path, method, operation)| OperationItem { path, method, operation })
+      .collect::<Vec<_>>();
+    let state = Arc::new(RwLock::new(State {
+      openapi_spec,
+      openapi_path,
+      openapi_operations,
+      active_operation_index: 0,
+      active_tag_name: None,
+    }));
     let focused_border_style = Style::default().fg(Color::LightGreen);
 
     Ok(Self {

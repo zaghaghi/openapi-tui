@@ -2,7 +2,6 @@ use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
-use oas3::Schema;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
@@ -19,7 +18,7 @@ use crate::{
 pub struct ResponseType {
   status: String,
   media_type: String,
-  schema: Schema,
+  schema: serde_json::Value,
 }
 
 #[derive(Default)]
@@ -89,20 +88,28 @@ impl ResponsePane {
   fn init_schema(&mut self) -> Result<()> {
     {
       let state = self.state.read().unwrap();
-      if let Some((_path, _method, operation)) = state.active_operation() {
-        self.schemas = operation
+      if let Some(operation_item) = state.active_operation() {
+        self.schemas = operation_item
+          .operation
           .responses
           .iter()
-          .filter_map(|(key, value)| value.resolve(&state.openapi_spec).map_or(None, |v| Some((key.to_string(), v))))
-          .flat_map(|(key, response)| {
+          .flatten()
+          .filter_map(|(status, value)| value.resolve().map_or(None, |v| Some((status.to_string(), v))))
+          .flat_map(|(status, response)| {
             response
               .content
               .iter()
+              .flatten()
               .filter_map(|(media_type, media)| {
-                media.schema(&state.openapi_spec).map_or(None, |schema| {
-                  Some(ResponseType { status: key.clone(), media_type: media_type.to_string(), schema })
+                media.schema.as_ref().map(|schema| {
+                  Some(ResponseType {
+                    status: status.clone(),
+                    media_type: media_type.to_string(),
+                    schema: schema.clone(),
+                  })
                 })
               })
+              .flatten()
               .collect::<Vec<ResponseType>>()
           })
           .collect();

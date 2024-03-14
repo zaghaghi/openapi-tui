@@ -115,16 +115,18 @@ impl Pane for ApisPane {
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let state = self.state.read().unwrap();
-    let items = state.openapi_spec.operations().filter_map(|operation| {
+    let items = state.openapi_operations.iter().filter_map(|operation_item| {
       if let Some(active_tag) = &state.active_tag_name {
-        if !operation.2.tags.contains(active_tag) {
+        if !operation_item.has_tag(active_tag) {
           return None;
         }
       }
-      let (path, method, _operation) = operation;
       Some(Line::from(vec![
-        Span::styled(format!(" {:7}", method.as_str()), Self::method_color(method.as_str())),
-        Span::styled(format!(" {:7}", path), Color::White),
+        Span::styled(
+          format!(" {:7}", operation_item.method.as_str()),
+          Self::method_color(operation_item.method.as_str()),
+        ),
+        Span::styled(format!(" {:7}", operation_item.path), Color::White),
       ]))
     });
 
