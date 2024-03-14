@@ -31,7 +31,7 @@ impl Parameter {
     Parameter { name, r#in, description: None, required: None, deprecated: None, schema: None, content: None }
   }
 }
-///
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum In {
   #[serde(rename = "query")]

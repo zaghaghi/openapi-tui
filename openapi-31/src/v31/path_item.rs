@@ -79,7 +79,7 @@ impl PathItem {
             v1.append(&mut v2);
             v1
           });
-          return (method.to_string(), op);
+          (method.to_string(), op)
         })
       })
       .collect::<Vec<_>>()

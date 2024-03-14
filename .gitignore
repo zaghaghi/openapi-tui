@@ -2,3 +2,4 @@
 .data/*.log
 .vscode/
 openapi.json
+openapi-31/target

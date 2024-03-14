@@ -27,7 +27,7 @@ impl Encoding {
     Encoding { content_type: None, headers: None, style: None, explode: None, allow_reserved: None }
   }
 }
-///
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Style {
   #[serde(rename = "form")]
