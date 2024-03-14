@@ -23,7 +23,7 @@ pub struct Parameter {
   #[serde(rename = "schema", default, skip_serializing_if = "Option::is_none")]
   pub schema: Option<serde_json::Value>,
   #[serde(rename = "content", skip_serializing_if = "Option::is_none")]
-  pub content: Option<std::collections::HashMap<String, v31::MediaType>>,
+  pub content: Option<std::collections::BTreeMap<String, v31::MediaType>>,
 }
 
 impl Parameter {

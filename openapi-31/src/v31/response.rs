@@ -13,11 +13,11 @@ pub struct Response {
   #[serde(rename = "description")]
   pub description: String,
   #[serde(rename = "headers", skip_serializing_if = "Option::is_none")]
-  pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub headers: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "content", skip_serializing_if = "Option::is_none")]
-  pub content: Option<std::collections::HashMap<String, v31::MediaType>>,
+  pub content: Option<std::collections::BTreeMap<String, v31::MediaType>>,
   #[serde(rename = "links", skip_serializing_if = "Option::is_none")]
-  pub links: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub links: Option<std::collections::BTreeMap<String, serde_json::Value>>,
 }
 
 impl Response {

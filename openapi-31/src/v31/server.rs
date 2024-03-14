@@ -15,7 +15,7 @@ pub struct Server {
   #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
   pub description: Option<String>,
   #[serde(rename = "variables", skip_serializing_if = "Option::is_none")]
-  pub variables: Option<std::collections::HashMap<String, v31::ServerVariable>>,
+  pub variables: Option<std::collections::BTreeMap<String, v31::ServerVariable>>,
 }
 
 impl Server {

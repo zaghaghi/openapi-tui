@@ -13,13 +13,13 @@ pub struct RequestBody {
   #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
   pub description: Option<String>,
   #[serde(rename = "content")]
-  pub content: std::collections::HashMap<String, v31::MediaType>,
+  pub content: std::collections::BTreeMap<String, v31::MediaType>,
   #[serde(rename = "required", skip_serializing_if = "Option::is_none")]
   pub required: Option<bool>,
 }
 
 impl RequestBody {
-  pub fn new(content: std::collections::HashMap<String, v31::MediaType>) -> RequestBody {
+  pub fn new(content: std::collections::BTreeMap<String, v31::MediaType>) -> RequestBody {
     RequestBody { description: None, content, required: None }
   }
 }

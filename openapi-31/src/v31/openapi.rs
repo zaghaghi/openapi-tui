@@ -18,10 +18,10 @@ pub struct Openapi {
   pub json_schema_dialect: Option<serde_json::Value>,
   #[serde(rename = "servers", default, skip_serializing_if = "Option::is_none")]
   pub servers: Option<serde_json::Value>,
-  #[serde(rename = "paths", skip_serializing_if = "std::collections::HashMap::is_empty")]
-  pub paths: std::collections::HashMap<String, v31::ObjectOrRef<v31::PathItem>>,
+  #[serde(rename = "paths", skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+  pub paths: std::collections::BTreeMap<String, v31::ObjectOrRef<v31::PathItem>>,
   #[serde(rename = "webhooks", skip_serializing_if = "Option::is_none")]
-  pub webhooks: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub webhooks: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "components", skip_serializing_if = "Option::is_none")]
   pub components: Option<Box<v31::Components>>,
   #[serde(rename = "security", default, skip_serializing_if = "Option::is_none")]
@@ -39,7 +39,7 @@ impl Openapi {
       info: Box::new(info),
       json_schema_dialect: None,
       servers: None,
-      paths: std::collections::HashMap::default(),
+      paths: std::collections::BTreeMap::default(),
       webhooks: None,
       components: None,
       security: None,

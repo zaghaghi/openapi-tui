@@ -13,11 +13,11 @@ pub struct MediaType {
   #[serde(rename = "schema", default, skip_serializing_if = "Option::is_none")]
   pub schema: Option<serde_json::Value>,
   #[serde(rename = "encoding", skip_serializing_if = "Option::is_none")]
-  pub encoding: Option<std::collections::HashMap<String, v31::Encoding>>,
+  pub encoding: Option<std::collections::BTreeMap<String, v31::Encoding>>,
   #[serde(rename = "example", default, skip_serializing_if = "Option::is_none")]
   pub example: Option<serde_json::Value>,
   #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
-  pub examples: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub examples: Option<std::collections::BTreeMap<String, serde_json::Value>>,
 }
 
 impl MediaType {

@@ -17,14 +17,14 @@ pub struct AuthorizationCode {
   #[serde(rename = "refreshUrl", skip_serializing_if = "Option::is_none")]
   pub refresh_url: Option<String>,
   #[serde(rename = "scopes")]
-  pub scopes: std::collections::HashMap<String, String>,
+  pub scopes: std::collections::BTreeMap<String, String>,
 }
 
 impl AuthorizationCode {
   pub fn new(
     authorization_url: String,
     token_url: String,
-    scopes: std::collections::HashMap<String, String>,
+    scopes: std::collections::BTreeMap<String, String>,
   ) -> AuthorizationCode {
     AuthorizationCode { authorization_url, token_url, refresh_url: None, scopes }
   }

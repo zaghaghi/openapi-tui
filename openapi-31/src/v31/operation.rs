@@ -25,13 +25,13 @@ pub struct Operation {
   #[serde(rename = "requestBody", default, skip_serializing_if = "Option::is_none")]
   pub request_body: Option<v31::ObjectOrRef<v31::RequestBody>>,
   #[serde(rename = "responses", skip_serializing_if = "Option::is_none")]
-  pub responses: Option<std::collections::HashMap<String, v31::ObjectOrRef<v31::Response>>>,
+  pub responses: Option<std::collections::BTreeMap<String, v31::ObjectOrRef<v31::Response>>>,
   #[serde(rename = "callbacks", skip_serializing_if = "Option::is_none")]
-  pub callbacks: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub callbacks: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "deprecated", skip_serializing_if = "Option::is_none")]
   pub deprecated: Option<bool>,
   #[serde(rename = "security", skip_serializing_if = "Option::is_none")]
-  pub security: Option<Vec<std::collections::HashMap<String, serde_json::Value>>>,
+  pub security: Option<Vec<std::collections::BTreeMap<String, serde_json::Value>>>,
   #[serde(rename = "servers", skip_serializing_if = "Option::is_none")]
   pub servers: Option<Vec<v31::Server>>,
 }

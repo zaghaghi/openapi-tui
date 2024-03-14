@@ -13,7 +13,7 @@ pub struct Encoding {
   #[serde(rename = "contentType", default, skip_serializing_if = "Option::is_none")]
   pub content_type: Option<serde_json::Value>,
   #[serde(rename = "headers", skip_serializing_if = "Option::is_none")]
-  pub headers: Option<std::collections::HashMap<String, serde_json::Value>>,
+  pub headers: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "style", default, skip_serializing_if = "Option::is_none")]
   pub style: Option<Style>,
   #[serde(rename = "explode", default, skip_serializing_if = "Option::is_none")]
