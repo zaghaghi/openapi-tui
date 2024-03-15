@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
-  pages::home::State,
+  pages::home::{OperationItemType, State},
   panes::Pane,
   tui::{EventResponse, Frame},
 };
@@ -102,20 +102,43 @@ impl Pane for AddressPane {
 
       let inner = area.inner(&INNER_MARGIN);
       frame.render_widget(
-        Paragraph::new(Line::from(vec![
-          Span::styled(
-            format!("{:7}", operation_item.method.as_str()),
-            Style::default().fg(Self::method_color(operation_item.method.as_str())),
-          ),
-          Span::styled(base_url, Style::default().fg(Color::DarkGray)),
-          Span::styled(&operation_item.path, Style::default().fg(Color::White)),
-        ])),
+        match operation_item.r#type {
+          OperationItemType::Path => {
+            Paragraph::new(Line::from(vec![
+              Span::styled(
+                format!("{:7}", operation_item.method.as_str()),
+                Style::default().fg(Self::method_color(operation_item.method.as_str())),
+              ),
+              Span::styled(base_url, Style::default().fg(Color::DarkGray)),
+              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            ]))
+          },
+          OperationItemType::Webhook => {
+            Paragraph::new(Line::from(vec![
+              Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
+              Span::styled(
+                format!("{} ", operation_item.method.as_str()),
+                Style::default().fg(Self::method_color(operation_item.method.as_str())),
+              ),
+              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            ]))
+          },
+        },
         inner,
       );
 
       frame.render_widget(
         Block::default()
           .title(title)
+          .borders(Borders::ALL)
+          .border_style(self.border_style())
+          .border_type(self.border_type()),
+        area,
+      );
+    } else {
+      frame.render_widget(
+        Block::default()
+          .title("[No Active API]")
           .borders(Borders::ALL)
           .border_style(self.border_style())
           .border_type(self.border_type()),

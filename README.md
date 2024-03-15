@@ -14,6 +14,9 @@ Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
 ## Fullscreen
 ![fullscreen](static/fullscreen.gif)
 
+## Webhooks
+![webhooks](static/webhooks.gif)
+
 # Installation
 Install from source:
 ```bash
@@ -70,12 +73,14 @@ Options:
 - [X] Viewer
 - [X] OpenAPI v3.1
 - [ ] Read Spec from STDIN
-- [ ] Display Webhooks
+- [X] Display Webhooks
 - [X] Display Info and Version 
 - [ ] Display Key Mappings in Popup
 - [ ] Remote API specification
+- [ ] Merge Parameters Based on `in`
 - [X] Pane Fullscreen Mode
 - [X] Nested Components
 - [X] Status Line
+- [ ] Cache Schema Styles
 - [ ] Command Line
 - [ ] Execute 
