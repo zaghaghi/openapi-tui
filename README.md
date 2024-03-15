@@ -44,6 +44,47 @@ You can install using `pacman` as follows:
 ❯ pacman -S openapi-tui
 ```
 
+### NixOS
+
+You can install the `openapi-tui` package directly with the following command:
+
+```bash
+nix profile install github:zaghaghi/openapi-tui
+```
+
+You can also install `openapi-tui` by adding it to your `configuration.nix` file.
+
+```nix
+# flake.nix
+
+{
+  inputs.openapi-tui.url = "github:zaghaghi/openapi-tui";
+  # ...
+
+  outputs = {nixpkgs, ...} @ inputs: {
+    nixosConfigurations.<your-hostname> = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; }; # this is the important part
+      modules = [
+        ./configuration.nix
+      ];
+    };
+  }
+}
+```
+
+Then, add `openapi-tui` to your `configuration.nix`
+
+```nix
+# configuration.nix
+
+{inputs, pkgs, ...}: {
+  environment.systemPackages = with pkgs; [
+    inputs.openapi-tui.packages.${pkgs.system}.openapi-tui
+  ];
+}
+```
+
+
 # Usage
 ```bash
 ❯ openapi-tui --help
