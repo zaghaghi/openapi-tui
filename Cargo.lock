@@ -1750,9 +1750,9 @@ dependencies = [
 
 [[package]]
 name = "openapi-31"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b163e6384957c194a0680bae535835fddea501ffa3988bb68fda9e6f1289b6bc"
+checksum = "4a8b92b4251c1548e68ac0b40549be7749e89cded5a545b88ea1d5f9f8801a3e"
 dependencies = [
  "derive_more",
  "serde",

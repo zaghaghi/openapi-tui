@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
-  pages::home::State,
+  pages::home::{OperationItemType, State},
   panes::Pane,
   tui::{EventResponse, Frame},
 };
@@ -97,7 +97,7 @@ impl Pane for ApisPane {
         let operations_len = state.operations_len();
         if operations_len > 0 {
           self.current_operation_index =
-            self.current_operation_index.saturating_add(operations_len - 1) % operations_len;
+            self.current_operation_index.saturating_add(operations_len.saturating_sub(1)) % operations_len;
         }
         state.active_operation_index = self.current_operation_index;
         return Ok(Some(Action::Update));
@@ -123,8 +123,14 @@ impl Pane for ApisPane {
       }
       Some(Line::from(vec![
         Span::styled(
-          format!(" {:7}", operation_item.method.as_str()),
-          Self::method_color(operation_item.method.as_str()),
+          format!(" {:7}", match operation_item.r#type {
+            OperationItemType::Path => operation_item.method.as_str(),
+            OperationItemType::Webhook => "EVENT",
+          }),
+          match operation_item.r#type {
+            OperationItemType::Path => Self::method_color(operation_item.method.as_str()),
+            OperationItemType::Webhook => Color::LightMagenta,
+          },
         ),
         Span::styled(format!(" {:7}", operation_item.path), Color::White),
       ]))

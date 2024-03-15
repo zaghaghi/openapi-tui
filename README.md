@@ -70,12 +70,14 @@ Options:
 - [X] Viewer
 - [X] OpenAPI v3.1
 - [ ] Read Spec from STDIN
-- [ ] Display Webhooks
+- [X] Display Webhooks
 - [X] Display Info and Version 
 - [ ] Display Key Mappings in Popup
 - [ ] Remote API specification
+- [ ] Merge Parameters Based on `in`
 - [X] Pane Fullscreen Mode
 - [X] Nested Components
 - [X] Status Line
+- [ ] Cache Schema Styles
 - [ ] Command Line
 - [ ] Execute 

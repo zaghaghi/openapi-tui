@@ -20,10 +20,15 @@ use crate::{
   tui::EventResponse,
 };
 
+pub enum OperationItemType {
+  Path,
+  Webhook,
+}
 pub struct OperationItem {
   pub path: String,
   pub method: String,
   pub operation: Operation,
+  pub r#type: OperationItemType,
 }
 
 impl OperationItem {
@@ -80,7 +85,13 @@ impl Home {
     let openapi_spec = serde_yaml::from_reader::<File, Openapi>(File::open(&openapi_path)?)?;
     let openapi_operations = openapi_spec
       .into_operations()
-      .map(|(path, method, operation)| OperationItem { path, method, operation })
+      .map(|(path, method, operation)| {
+        if path.starts_with('/') {
+          OperationItem { path, method, operation, r#type: OperationItemType::Path }
+        } else {
+          OperationItem { path, method, operation, r#type: OperationItemType::Webhook }
+        }
+      })
       .collect::<Vec<_>>();
     let state = Arc::new(RwLock::new(State {
       openapi_spec,
