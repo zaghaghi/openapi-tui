@@ -13,7 +13,10 @@ use crate::{
   action::Action,
   config::Config,
   pages::Page,
-  panes::{address::AddressPane, apis::ApisPane, request::RequestPane, response::ResponsePane, tags::TagsPane, Pane},
+  panes::{
+    address::AddressPane, apis::ApisPane, footer::FooterPane, header::HeaderPane, request::RequestPane,
+    response::ResponsePane, tags::TagsPane, Pane,
+  },
   tui::EventResponse,
 };
 
@@ -65,6 +68,7 @@ pub struct Home {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   panes: Vec<Box<dyn Pane>>,
+  static_panes: Vec<Box<dyn Pane>>,
   focused_pane_index: usize,
   #[allow(dead_code)]
   state: Arc<RwLock<State>>,
@@ -97,6 +101,7 @@ impl Home {
         Box::new(RequestPane::new(state.clone(), false, focused_border_style)),
         Box::new(ResponsePane::new(state.clone(), false, focused_border_style)),
       ],
+      static_panes: vec![Box::new(HeaderPane::new(state.clone())), Box::new(FooterPane::new(state.clone()))],
       focused_pane_index: 0,
       state,
       fullscreen_pane_index: None,
@@ -183,24 +188,19 @@ impl Page for Home {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let verical_layout = Layout::default()
       .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Fill(1), Constraint::Max(1)])
+      .constraints(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)])
       .split(area);
-    const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    frame.render_widget(
-      Line::from(vec![
-        Span::styled(format!("[l/h {ARROW} next/prev pane] [j/k {ARROW} next/prev item] [1-9 {ARROW} select tab] [g/b {ARROW} go/back definitions] [q {ARROW} quit]"), Style::default()),
-      ])
-      .style(Style::default().fg(Color::DarkGray)),
-      verical_layout[1],
-    );
+
+    self.static_panes[0].draw(frame, verical_layout[0])?;
+    self.static_panes[1].draw(frame, verical_layout[2])?;
 
     if let Some(fullscreen_pane_index) = self.fullscreen_pane_index {
-      self.panes[fullscreen_pane_index].draw(frame, verical_layout[0])?;
+      self.panes[fullscreen_pane_index].draw(frame, verical_layout[1])?;
     } else {
       let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
-        .split(verical_layout[0]);
+        .split(verical_layout[1]);
 
       let left_panes = Layout::default()
         .direction(Direction::Vertical)

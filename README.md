@@ -61,14 +61,18 @@ Options:
 | `↓`, `j` | Move down in lists |
 | `↑`, `k` | Move up in lists |
 | `1...9` | Move between tabs |
-| 'f' | Toggle fullscreen pane|
+| `f` | Toggle fullscreen pane|
 | `g` | Go in nested items in lists|
 | `Backspace`, `b` | Get out of nested items in lists|
 
 
 # Milestones
 - [X] Viewer
-- [ ] OpenAPI v3.1
+- [X] OpenAPI v3.1
+- [ ] Read Spec from STDIN
+- [ ] Display Webhooks
+- [X] Display Info and Version 
+- [ ] Display Key Mappings in Popup
 - [ ] Remote API specification
 - [X] Pane Fullscreen Mode
 - [X] Nested Components

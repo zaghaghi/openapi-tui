@@ -145,6 +145,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+        
       - uses: Swatinem/rust-cache@v2
       - run: cargo publish
         env:
