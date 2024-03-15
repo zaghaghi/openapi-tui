@@ -217,7 +217,7 @@ impl Pane for RequestPane {
 
     frame.render_widget(
       Tabs::new(self.schemas.iter().map(|item| {
-        let mut title = item.title.clone();
+        let title = item.title.clone();
         Span::styled(title, Style::default().fg(self.location_color(item.location.as_str()))).dim()
       }))
       .highlight_style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED).not_dim())
