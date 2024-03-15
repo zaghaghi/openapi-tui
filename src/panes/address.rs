@@ -91,9 +91,9 @@ impl Pane for AddressPane {
     let state = self.state.read().unwrap();
     if let Some(operation_item) = state.active_operation() {
       let base_url = if let Some(server) = state.openapi_spec.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-        server.url.clone()
+        String::from(server.url.trim_end_matches('/'))
       } else if let Some(server) = operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-        server.url.clone()
+        String::from(server.url.trim_end_matches('/'))
       } else {
         String::from("http://localhost")
       };

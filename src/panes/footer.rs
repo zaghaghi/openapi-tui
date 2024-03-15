@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::Paragraph};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
@@ -45,7 +45,14 @@ impl Pane for FooterPane {
     self.input.handle_event(&Event::Key(key));
     let response = match key.code {
       KeyCode::Enter => Some(EventResponse::Stop(Action::Filter(self.input.to_string()))),
-      KeyCode::Esc => Some(EventResponse::Stop(Action::Filter(String::default()))),
+      KeyCode::Esc => {
+        let filter: String;
+        {
+          let state = self.state.read().unwrap();
+          filter = state.active_filter.clone();
+        }
+        Some(EventResponse::Stop(Action::Filter(filter)))
+      },
       _ => Some(EventResponse::Stop(Action::Noop)),
     };
     Ok(response)
@@ -54,7 +61,7 @@ impl Pane for FooterPane {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
     if self.focused {
-      let search_label = "Search: ";
+      let search_label = "Filter: ";
       let width = area.width.max(3);
       let scroll = self.input.visual_scroll(width as usize);
       let input = Paragraph::new(Line::from(vec![

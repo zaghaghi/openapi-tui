@@ -88,6 +88,8 @@ impl ResponsePane {
   fn init_schema(&mut self) -> Result<()> {
     {
       let state = self.state.read().unwrap();
+      self.schemas = vec![];
+
       if let Some(operation_item) = state.active_operation() {
         self.schemas = operation_item
           .operation

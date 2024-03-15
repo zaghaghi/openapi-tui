@@ -51,6 +51,7 @@ pub struct State {
   pub openapi_operations: Vec<OperationItem>,
   pub active_operation_index: usize,
   pub active_tag_name: Option<String>,
+  pub active_filter: String,
 }
 
 impl State {
@@ -59,18 +60,32 @@ impl State {
       self
         .openapi_operations
         .iter()
-        .filter(|flat_operation| flat_operation.has_tag(active_tag))
+        .filter(|flat_operation| {
+          flat_operation.has_tag(active_tag) && flat_operation.path.contains(self.active_filter.as_str())
+        })
         .nth(self.active_operation_index)
     } else {
-      self.openapi_operations.get(self.active_operation_index)
+      self
+        .openapi_operations
+        .iter()
+        .filter(|flat_operation| flat_operation.path.contains(self.active_filter.as_str()))
+        .nth(self.active_operation_index)
     }
   }
 
   pub fn operations_len(&self) -> usize {
     if let Some(active_tag) = &self.active_tag_name {
-      self.openapi_operations.iter().filter(|item| item.has_tag(active_tag)).count()
+      self
+        .openapi_operations
+        .iter()
+        .filter(|item| item.has_tag(active_tag) && item.path.contains(self.active_filter.as_str()))
+        .count()
     } else {
-      self.openapi_operations.len()
+      self
+        .openapi_operations
+        .iter()
+        .filter(|flat_operation| flat_operation.path.contains(self.active_filter.as_str()))
+        .count()
     }
   }
 }
@@ -107,6 +122,7 @@ impl Home {
       openapi_operations,
       active_operation_index: 0,
       active_tag_name: None,
+      active_filter: String::default(),
     }));
     let focused_border_style = Style::default().fg(Color::LightGreen);
 
@@ -185,12 +201,18 @@ impl Page for Home {
         self.static_panes[1].focus()?;
         self.input_mode = InputMode::Insert;
       },
-      Action::Filter(_filter) => {
+      Action::Filter(filter) => {
         self.static_panes[1].unfocus()?;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.focus()?;
         }
         self.input_mode = InputMode::Normal;
+        {
+          let mut state = self.state.write().unwrap();
+          state.active_operation_index = 0;
+          state.active_filter = filter;
+        }
+        return Ok(Some(Action::Update));
       },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
