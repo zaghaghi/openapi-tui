@@ -121,6 +121,9 @@ impl Pane for ApisPane {
           return None;
         }
       }
+      if !operation_item.path.contains(state.active_filter.as_str()) {
+        return None;
+      }
       Some(Line::from(vec![
         Span::styled(
           format!(" {:7}", match operation_item.r#type {
