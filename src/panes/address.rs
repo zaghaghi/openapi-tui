@@ -121,6 +121,15 @@ impl Pane for AddressPane {
           .border_type(self.border_type()),
         area,
       );
+    } else {
+      frame.render_widget(
+        Block::default()
+          .title("[No Active API]")
+          .borders(Borders::ALL)
+          .border_style(self.border_style())
+          .border_type(self.border_type()),
+        area,
+      );
     }
 
     Ok(())

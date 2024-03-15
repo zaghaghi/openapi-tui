@@ -142,12 +142,12 @@ impl Pane for ResponsePane {
 
   fn height_constraint(&self) -> Constraint {
     if self.schemas.get(self.schemas_index).is_none() {
-      return Constraint::Max(2);
+      return Constraint::Min(2);
     }
 
     match self.focused {
-      true => Constraint::Fill(3),
-      false => Constraint::Fill(1),
+      true => Constraint::Fill(30),
+      false => Constraint::Fill(10),
     }
   }
 

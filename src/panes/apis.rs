@@ -146,8 +146,12 @@ impl Pane for ApisPane {
         .border_style(self.border_style())
         .border_type(self.border_type())
         .title_bottom(
-          Line::from(format!("{} of {}", self.current_operation_index.saturating_add(1), state.operations_len()))
-            .right_aligned(),
+          Line::from(format!(
+            "{} of {}",
+            self.current_operation_index.saturating_add(1).min(state.operations_len()),
+            state.operations_len()
+          ))
+          .right_aligned(),
         )
         .title(Line::styled(active_tag, Style::default().add_modifier(Modifier::ITALIC)).right_aligned()),
       area,
