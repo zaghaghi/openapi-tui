@@ -20,8 +20,8 @@ pub struct Openapi {
   pub servers: Option<Vec<v31::Server>>,
   #[serde(rename = "paths", default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
   pub paths: std::collections::BTreeMap<String, v31::ObjectOrRef<v31::PathItem>>,
-  #[serde(rename = "webhooks", skip_serializing_if = "Option::is_none")]
-  pub webhooks: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  #[serde(rename = "webhooks", default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+  pub webhooks: std::collections::BTreeMap<String, v31::ObjectOrRef<v31::PathItem>>,
   #[serde(rename = "components", skip_serializing_if = "Option::is_none")]
   pub components: Option<Box<v31::Components>>,
   #[serde(rename = "security", default, skip_serializing_if = "Option::is_none")]
@@ -40,7 +40,7 @@ impl Openapi {
       json_schema_dialect: None,
       servers: None,
       paths: std::collections::BTreeMap::default(),
-      webhooks: None,
+      webhooks: std::collections::BTreeMap::default(),
       components: None,
       security: None,
       tags: None,
@@ -58,5 +58,16 @@ impl Openapi {
       })
       .collect::<Vec<_>>()
       .into_iter()
+      .chain(
+        self
+          .webhooks
+          .iter()
+          .filter_map(|(path, path_item_ref)| path_item_ref.resolve().ok().map(|path_item| (path, path_item)))
+          .flat_map(|(path, path_item)| {
+            path_item.into_operations().map(|(method, operation)| (path.clone(), method, operation))
+          })
+          .collect::<Vec<_>>()
+          .into_iter(),
+      )
   }
 }
