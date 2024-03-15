@@ -90,8 +90,9 @@ impl Pane for AddressPane {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
     let state = self.state.read().unwrap();
     if let Some(operation_item) = state.active_operation() {
-      let base_url = if let Some(server) = operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None)
-      {
+      let base_url = if let Some(server) = state.openapi_spec.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
+        server.url.clone()
+      } else if let Some(server) = operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
         server.url.clone()
       } else {
         String::from("http://localhost")

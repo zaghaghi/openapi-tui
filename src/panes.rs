@@ -9,6 +9,8 @@ use crate::{
 
 pub mod address;
 pub mod apis;
+pub mod footer;
+pub mod header;
 pub mod request;
 pub mod response;
 pub mod tags;
