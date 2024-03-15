@@ -18,8 +18,6 @@ use crate::{
 
 pub struct RequestType {
   location: String,
-  media_type: String,
-
   schema: serde_json::Value,
   title: String,
 }
@@ -74,48 +72,59 @@ impl RequestPane {
     if status.starts_with("body") {
       return Color::LightYellow;
     }
+    if status.starts_with("cookie") {
+      return Color::LightRed;
+    }
     Color::default()
   }
 
   fn init_schema(&mut self) -> Result<()> {
     {
       let state = self.state.read().unwrap();
-      if let Some(operation_item) = state.active_operation() {
-        let mut schemas: Vec<RequestType> = vec![];
-        if let Some(request_body) = &operation_item.operation.request_body {
-          schemas = request_body
-            .resolve()
-            .unwrap()
-            .content
-            .iter()
-            .filter_map(|(media_type, media)| {
-              media.schema.as_ref().map(|schema| {
-                Some(RequestType {
-                  location: "body".to_string(),
-                  media_type: media_type.clone(),
-                  title: "Body".to_string(),
-                  schema: schema.clone(),
-                })
-              })
+      self.schemas = vec![];
+
+      macro_rules! push_schema {
+        ($map:ident, $title:expr, $location:expr) => {{
+          if !$map.is_empty() {
+            self.schemas.push(RequestType {
+              location: $location.to_string(),
+              schema: serde_json::Value::Object($map),
+              title: $title.to_string(),
             })
-            .flatten()
-            .collect();
-        }
-        schemas.extend(operation_item.operation.parameters.iter().flatten().map(|parameter_or_ref| {
-          let parameter = parameter_or_ref.resolve().unwrap();
-          RequestType {
-            location: match parameter.r#in {
-              In::Query => "Query".to_string(),
-              In::Header => "Header".to_string(),
-              In::Path => "Path".to_string(),
-              In::Cookie => "Cookie".to_string(),
-            },
-            media_type: String::default(),
-            schema: parameter.schema.as_ref().unwrap().clone(),
-            title: parameter.name.clone(),
           }
-        }));
-        self.schemas = schemas;
+        }};
+      }
+      if let Some(operation_item) = state.active_operation() {
+        if let Some(request_body) = &operation_item.operation.request_body {
+          let mut bodies = serde_json::Map::new();
+
+          request_body.resolve().unwrap().content.iter().for_each(|(media_type, media)| {
+            if let Some(schema) = &media.schema {
+              bodies.insert(media_type.clone(), schema.clone());
+            }
+          });
+
+          push_schema!(bodies, "Body", "body");
+        }
+        let mut query_parameters = serde_json::Map::new();
+        let mut header_parameters = serde_json::Map::new();
+        let mut path_parameters = serde_json::Map::new();
+        let mut cookie_parameters = serde_json::Map::new();
+        operation_item.operation.parameters.iter().flatten().for_each(|parameter_or_ref| {
+          let parameter = parameter_or_ref.resolve().unwrap();
+          match parameter.r#in {
+            In::Query => &mut query_parameters,
+            In::Header => &mut header_parameters,
+            In::Path => &mut path_parameters,
+            In::Cookie => &mut cookie_parameters,
+          }
+          .insert(parameter.name.clone(), parameter.schema.as_ref().unwrap_or(&serde_json::Value::Null).clone());
+        });
+
+        push_schema!(query_parameters, "Query", "query");
+        push_schema!(header_parameters, "Header", "header");
+        push_schema!(path_parameters, "Path", "path");
+        push_schema!(cookie_parameters, "Cookie", "cookie");
       }
     }
     if let Some(request_type) = self.schemas.get(self.schemas_index) {
@@ -124,34 +133,6 @@ impl RequestPane {
       self.schema_viewer.clear();
     }
     Ok(())
-  }
-
-  fn legend_line(&self) -> Line {
-    if self.schema_viewer.schema_path().is_empty() {
-      Line::from(vec![
-        Span::raw("["),
-        Span::styled("Body".to_string(), self.location_color("body")),
-        Span::raw("/"),
-        Span::styled("Path".to_string(), self.location_color("path")),
-        Span::raw("/"),
-        Span::styled("Query".to_string(), self.location_color("query")),
-        Span::raw("/"),
-        Span::styled("Header".to_string(), self.location_color("header")),
-        Span::raw("]"),
-      ])
-    } else {
-      Line::from(vec![
-        Span::raw("["),
-        Span::styled("B".to_string(), self.location_color("body")),
-        Span::raw("/"),
-        Span::styled("P".to_string(), self.location_color("path")),
-        Span::raw("/"),
-        Span::styled("Q".to_string(), self.location_color("query")),
-        Span::raw("/"),
-        Span::styled("H".to_string(), self.location_color("header")),
-        Span::raw("]"),
-      ])
-    }
   }
 
   fn nested_schema_path_line(&self) -> Line {
@@ -237,9 +218,6 @@ impl Pane for RequestPane {
     frame.render_widget(
       Tabs::new(self.schemas.iter().map(|item| {
         let mut title = item.title.clone();
-        if !item.media_type.is_empty() {
-          title.push_str(format!(" [{}]", item.media_type).as_str());
-        }
         Span::styled(title, Style::default().fg(self.location_color(item.location.as_str()))).dim()
       }))
       .highlight_style(Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED).not_dim())
@@ -258,7 +236,6 @@ impl Pane for RequestPane {
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type())
-        .title_bottom(self.legend_line().style(Style::default().dim()).right_aligned())
         .title_bottom(
           self
             .nested_schema_path_line()
