@@ -17,6 +17,9 @@ Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
 ## Webhooks
 ![webhooks](static/webhooks.gif)
 
+## Filter
+![filter](static/filter.gif)
+
 # Installation
 Install from source:
 ```bash
@@ -75,7 +78,7 @@ Options:
 - [X] OpenAPI v3.1
 - [X] Display Webhooks
 - [X] Display Info and Version
-- [ ] Search #12
+- [X] Search #12
 - [ ] Display Key Mappings in Popup
 - [ ] Execute 
 - [ ] Remote API specification

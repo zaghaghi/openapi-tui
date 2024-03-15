@@ -78,7 +78,7 @@ impl Pane for FooterPane {
     } else {
       frame.render_widget(
        Line::from(vec![
-          Span::styled(format!("[l,h,j,k {ARROW} movement] [/ {ARROW} search] [1-9 {ARROW} select tab] [g,b {ARROW} go/back definitions] [q {ARROW} quit]"), Style::default()),
+          Span::styled(format!("[l,h,j,k {ARROW} movement] [/ {ARROW} filter] [1-9 {ARROW} select tab] [g,b {ARROW} go/back definitions] [q {ARROW} quit]"), Style::default()),
         ])
         .style(Style::default().fg(Color::DarkGray)),
         area,
