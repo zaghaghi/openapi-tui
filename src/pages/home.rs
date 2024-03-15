@@ -20,6 +20,13 @@ use crate::{
   tui::EventResponse,
 };
 
+#[derive(Default)]
+pub enum InputMode {
+  #[default]
+  Normal,
+  Insert,
+}
+
 pub enum OperationItemType {
   Path,
   Webhook,
@@ -78,6 +85,7 @@ pub struct Home {
   #[allow(dead_code)]
   state: Arc<RwLock<State>>,
   fullscreen_pane_index: Option<usize>,
+  input_mode: InputMode,
 }
 
 impl Home {
@@ -116,6 +124,7 @@ impl Home {
       focused_pane_index: 0,
       state,
       fullscreen_pane_index: None,
+      input_mode: InputMode::Normal,
     })
   }
 }
@@ -169,6 +178,20 @@ impl Page for Home {
       Action::ToggleFullScreen => {
         self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
       },
+      Action::FocusFooter => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.unfocus()?;
+        }
+        self.static_panes[1].focus()?;
+        self.input_mode = InputMode::Insert;
+      },
+      Action::Filter(_filter) => {
+        self.static_panes[1].unfocus()?;
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.focus()?;
+        }
+        self.input_mode = InputMode::Normal;
+      },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           return pane.update(action);
@@ -179,21 +202,29 @@ impl Page for Home {
   }
 
   fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    let response = match key.code {
-      KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => EventResponse::Stop(Action::FocusNext),
-      KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),
-      KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
-      KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
-      KeyCode::Char('g') | KeyCode::Char('G') => EventResponse::Stop(Action::Go),
-      KeyCode::Backspace | KeyCode::Char('b') | KeyCode::Char('B') => EventResponse::Stop(Action::Back),
-      KeyCode::Enter => EventResponse::Stop(Action::Submit),
-      KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
-      KeyCode::Char(c) if ('1'..='9').contains(&c) => EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1)),
-      _ => {
-        return Ok(None);
+    match self.input_mode {
+      InputMode::Normal => {
+        let response = match key.code {
+          KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => EventResponse::Stop(Action::FocusNext),
+          KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),
+          KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
+          KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
+          KeyCode::Char('g') | KeyCode::Char('G') => EventResponse::Stop(Action::Go),
+          KeyCode::Backspace | KeyCode::Char('b') | KeyCode::Char('B') => EventResponse::Stop(Action::Back),
+          KeyCode::Enter => EventResponse::Stop(Action::Submit),
+          KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
+          KeyCode::Char(c) if ('1'..='9').contains(&c) => {
+            EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1))
+          },
+          KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter),
+          _ => {
+            return Ok(None);
+          },
+        };
+        Ok(Some(response))
       },
-    };
-    Ok(Some(response))
+      InputMode::Insert => self.static_panes[1].handle_key_events(key),
+    }
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {

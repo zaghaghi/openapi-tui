@@ -66,14 +66,16 @@ Options:
 | `1...9` | Move between tabs |
 | `f` | Toggle fullscreen pane|
 | `g` | Go in nested items in lists|
+| `/` | Filter apis|
 | `Backspace`, `b` | Get out of nested items in lists|
 
 
-# Milestones
+# Features
 - [X] Viewer
 - [X] OpenAPI v3.1
 - [X] Display Webhooks
-- [X] Display Info and Version 
+- [X] Display Info and Version
+- [ ] Search #12
 - [ ] Display Key Mappings in Popup
 - [ ] Execute 
 - [ ] Remote API specification

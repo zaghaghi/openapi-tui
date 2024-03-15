@@ -22,4 +22,7 @@ pub enum Action {
   Go,
   Back,
   ToggleFullScreen,
+  FocusFooter,
+  Filter(String),
+  Noop,
 }
