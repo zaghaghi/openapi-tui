@@ -27,8 +27,8 @@ pub struct App {
 }
 
 impl App {
-  pub fn new(openapi_path: String) -> Result<Self> {
-    let home = Home::new(openapi_path)?;
+  pub async fn new(openapi_path: String) -> Result<Self> {
+    let home = Home::new(openapi_path).await?;
     let config = Config::new()?;
     let mode = Mode::Home;
     Ok(Self {

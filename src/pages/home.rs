@@ -1,7 +1,4 @@
-use std::{
-  fs::File,
-  sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -104,8 +101,21 @@ pub struct Home {
 }
 
 impl Home {
-  pub fn new(openapi_path: String) -> Result<Self> {
-    let openapi_spec = serde_yaml::from_reader::<File, Openapi>(File::open(&openapi_path)?)?;
+  pub async fn new(openapi_path: String) -> Result<Self> {
+    let openapi_spec = if let Ok(url) = reqwest::Url::parse(openapi_path.as_str()) {
+      let resp: String = reqwest::get(url.clone()).await?.text().await?;
+      let mut spec = serde_yaml::from_str::<Openapi>(resp.as_str())?;
+      if spec.servers.is_none() {
+        let origin = url.origin().ascii_serialization();
+        spec.servers = Some(vec![openapi_31::v31::Server::new(format!("{}/", origin))]);
+      }
+      spec
+    } else {
+      tokio::fs::read_to_string(&openapi_path)
+        .await
+        .map(|content| serde_yaml::from_str::<Openapi>(content.as_str()))??
+    };
+
     let openapi_operations = openapi_spec
       .into_operations()
       .map(|(path, method, operation)| {

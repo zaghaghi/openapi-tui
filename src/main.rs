@@ -23,7 +23,7 @@ async fn tokio_main() -> Result<()> {
   initialize_panic_handler()?;
 
   let args = Cli::parse();
-  let mut app = App::new(args.input)?;
+  let mut app = App::new(args.input).await?;
   app.run().await?;
 
   Ok(())
