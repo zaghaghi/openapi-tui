@@ -96,7 +96,9 @@ impl ResponsePane {
           .responses
           .iter()
           .flatten()
-          .filter_map(|(status, value)| value.resolve().map_or(None, |v| Some((status.to_string(), v))))
+          .filter_map(|(status, value)| {
+            value.resolve(&state.openapi_spec).map_or(None, |v| Some((status.to_string(), v)))
+          })
           .flat_map(|(status, response)| {
             response
               .content

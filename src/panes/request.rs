@@ -98,7 +98,7 @@ impl RequestPane {
         if let Some(request_body) = &operation_item.operation.request_body {
           let mut bodies = serde_json::Map::new();
 
-          request_body.resolve().unwrap().content.iter().for_each(|(media_type, media)| {
+          request_body.resolve(&state.openapi_spec).unwrap().content.iter().for_each(|(media_type, media)| {
             if let Some(schema) = &media.schema {
               bodies.insert(media_type.clone(), schema.clone());
             }
@@ -111,7 +111,7 @@ impl RequestPane {
         let mut path_parameters = serde_json::Map::new();
         let mut cookie_parameters = serde_json::Map::new();
         operation_item.operation.parameters.iter().flatten().for_each(|parameter_or_ref| {
-          let parameter = parameter_or_ref.resolve().unwrap();
+          let parameter = parameter_or_ref.resolve(&state.openapi_spec).unwrap();
           match parameter.r#in {
             In::Query => &mut query_parameters,
             In::Header => &mut header_parameters,
