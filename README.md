@@ -5,6 +5,31 @@
 
 Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
 
+
+# Usage
+```bash
+❯ openapi-tui --help
+This TUI allows you to list and browse APIs described by the openapi specification.
+
+Usage: openapi-tui --input <PATH>
+
+Options:
+  -i, --input <PATH>  Input file or url, in json or yaml format with openapi specification
+  -h, --help          Print help
+  -V, --version       Print version
+```
+
+## Examples
+```bash
+# open local yaml file
+❯ openapi-tui -i examples/stripe/spec.yml
+
+# open local json file
+❯ openapi-tui -i examples/petstore.json
+
+# open remote file
+❯ openapi-tui -i https://raw.githubusercontent.com/github/rest-api-description/main/descriptions-next/api.github.com/api.github.com.yaml
+```
 # Demo
 ![demo](static/demo.gif)
 
@@ -84,20 +109,6 @@ Then, add `openapi-tui` to your `configuration.nix`
 }
 ```
 
-
-# Usage
-```bash
-❯ openapi-tui --help
-This TUI allows you to list and browse APIs described by the openapi specification.
-
-Usage: openapi-tui [OPTIONS]
-
-Options:
-  -o, --openapi-path <PATH>  Input file, i.e. json or yaml file with openapi specification [default:
-                             openapi.json]
-  -h, --help                 Print help
-  -V, --version              Print version
-```
 
 # Keybindings
 
