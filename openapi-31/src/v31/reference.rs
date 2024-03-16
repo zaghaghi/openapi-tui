@@ -40,16 +40,96 @@ pub enum ObjectOrRef<T> {
 
 #[derive(Clone, Debug, PartialEq, Display, Error)]
 pub enum ObjectRefErr {
-  #[display(fmt = "Reference Error")]
+  #[display(fmt = "unresolved reference")]
+  UnresolvedRef,
+
+  #[display(fmt = "mismatch reference")]
+  MismatchedRef,
+
+  #[display(fmt = "reference error")]
   Ref,
 }
 
-impl<T> ObjectOrRef<T> {
-  // TODO: implement resolve
-  pub fn resolve(&self) -> Result<&T, ObjectRefErr> {
+impl<T> ObjectOrRef<T>
+where
+  T: Resolve + Clone,
+{
+  pub fn resolve(&self, openapi: &v31::Openapi) -> Result<T, ObjectRefErr> {
     match self {
-      ObjectOrRef::Object(object) => Ok(object),
-      ObjectOrRef::Ref { r#ref: _ } => Err(ObjectRefErr::Ref),
+      ObjectOrRef::Object(object) => Ok(object.clone()),
+      ObjectOrRef::Ref { r#ref } => T::resolve(r#ref, openapi),
     }
+  }
+}
+
+pub trait Resolve {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr>
+  where
+    Self: Sized;
+}
+
+#[macro_export]
+macro_rules! default_resolve_strategy {
+  ($ref:ident, $openapi:ident, $component:ident, $postfix:literal) => {{
+    static REF_PREFIX: &str = concat!("#/components/", $postfix, "/");
+    if !$ref.starts_with(REF_PREFIX) {
+      return Err(v31::reference::ObjectRefErr::MismatchedRef);
+    }
+    let (_, item_name) = $ref.split_at(REF_PREFIX.len());
+    $openapi
+      .components
+      .as_ref()
+      .and_then(|components| components.$component.as_ref())
+      .and_then(|items| items.get(item_name))
+      .and_then(|item| Some(item.clone()))
+      .ok_or_else(|| v31::reference::ObjectRefErr::UnresolvedRef)
+  }};
+}
+
+impl Resolve for v31::Parameter {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, parameters, "parameters")
+  }
+}
+
+impl Resolve for v31::Response {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, responses, "responses")
+  }
+}
+
+impl Resolve for v31::Examples {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, examples, "examples")
+  }
+}
+
+impl Resolve for v31::RequestBody {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, request_bodies, "requestBodies")
+  }
+}
+
+impl Resolve for v31::Header {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, headers, "headers")
+  }
+}
+
+impl Resolve for v31::SecurityScheme {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, security_schemes, "securitySchemas")
+  }
+}
+
+impl Resolve for v31::Link {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, links, "links")
+  }
+}
+
+impl Resolve for v31::PathItem {
+  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+    default_resolve_strategy!(r#ref, openapi, path_items, "pathItems")
   }
 }

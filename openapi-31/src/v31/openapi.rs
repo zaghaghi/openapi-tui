@@ -52,7 +52,7 @@ impl Openapi {
     self
       .paths
       .iter()
-      .filter_map(|(path, path_item_ref)| path_item_ref.resolve().ok().map(|path_item| (path, path_item)))
+      .filter_map(|(path, path_item_ref)| path_item_ref.resolve(self).ok().map(|path_item| (path, path_item)))
       .flat_map(|(path, path_item)| {
         path_item.into_operations().map(|(method, operation)| (path.clone(), method, operation))
       })
@@ -62,7 +62,7 @@ impl Openapi {
         self
           .webhooks
           .iter()
-          .filter_map(|(path, path_item_ref)| path_item_ref.resolve().ok().map(|path_item| (path, path_item)))
+          .filter_map(|(path, path_item_ref)| path_item_ref.resolve(self).ok().map(|path_item| (path, path_item)))
           .flat_map(|(path, path_item)| {
             path_item.into_operations().map(|(method, operation)| (path.clone(), method, operation))
           })
