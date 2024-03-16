@@ -1,6 +1,6 @@
 [package]
 name = "openapi-31"
-version = "0.3.0"
+version = "0.4.0"
 description = "OpenAPI v3.1 Specification"
 
 authors = ["Hamed Zaghaghi <hamed.zaghaghi@gmail.com>"]

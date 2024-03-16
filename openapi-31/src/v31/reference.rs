@@ -63,7 +63,7 @@ where
 }
 
 pub trait Resolve {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr>
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr>
   where
     Self: Sized;
 }
@@ -87,49 +87,49 @@ macro_rules! default_resolve_strategy {
 }
 
 impl Resolve for v31::Parameter {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, parameters, "parameters")
   }
 }
 
 impl Resolve for v31::Response {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, responses, "responses")
   }
 }
 
 impl Resolve for v31::Examples {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, examples, "examples")
   }
 }
 
 impl Resolve for v31::RequestBody {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, request_bodies, "requestBodies")
   }
 }
 
 impl Resolve for v31::Header {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, headers, "headers")
   }
 }
 
 impl Resolve for v31::SecurityScheme {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, security_schemes, "securitySchemas")
   }
 }
 
 impl Resolve for v31::Link {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, links, "links")
   }
 }
 
 impl Resolve for v31::PathItem {
-  fn resolve(r#ref: &String, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
+  fn resolve(r#ref: &str, openapi: &v31::Openapi) -> Result<Self, v31::reference::ObjectRefErr> {
     default_resolve_strategy!(r#ref, openapi, path_items, "pathItems")
   }
 }

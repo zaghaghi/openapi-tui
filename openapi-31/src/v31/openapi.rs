@@ -66,8 +66,7 @@ impl Openapi {
           .flat_map(|(path, path_item)| {
             path_item.into_operations().map(|(method, operation)| (path.clone(), method, operation))
           })
-          .collect::<Vec<_>>()
-          .into_iter(),
+          .collect::<Vec<_>>(),
       )
   }
 }
