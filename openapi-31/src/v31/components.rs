@@ -13,23 +13,23 @@ pub struct Components {
   #[serde(rename = "schemas", skip_serializing_if = "Option::is_none")]
   pub schemas: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "responses", skip_serializing_if = "Option::is_none")]
-  pub responses: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub responses: Option<std::collections::BTreeMap<String, v31::Response>>,
   #[serde(rename = "parameters", skip_serializing_if = "Option::is_none")]
-  pub parameters: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub parameters: Option<std::collections::BTreeMap<String, v31::Parameter>>,
   #[serde(rename = "examples", skip_serializing_if = "Option::is_none")]
-  pub examples: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub examples: Option<std::collections::BTreeMap<String, v31::Examples>>,
   #[serde(rename = "requestBodies", skip_serializing_if = "Option::is_none")]
-  pub request_bodies: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub request_bodies: Option<std::collections::BTreeMap<String, v31::RequestBody>>,
   #[serde(rename = "headers", skip_serializing_if = "Option::is_none")]
-  pub headers: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub headers: Option<std::collections::BTreeMap<String, v31::Header>>,
   #[serde(rename = "securitySchemes", skip_serializing_if = "Option::is_none")]
-  pub security_schemes: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub security_schemes: Option<std::collections::BTreeMap<String, v31::SecurityScheme>>,
   #[serde(rename = "links", skip_serializing_if = "Option::is_none")]
-  pub links: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub links: Option<std::collections::BTreeMap<String, v31::Link>>,
   #[serde(rename = "callbacks", skip_serializing_if = "Option::is_none")]
   pub callbacks: Option<std::collections::BTreeMap<String, serde_json::Value>>,
   #[serde(rename = "pathItems", skip_serializing_if = "Option::is_none")]
-  pub path_items: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+  pub path_items: Option<std::collections::BTreeMap<String, v31::PathItem>>,
 }
 
 impl Components {
