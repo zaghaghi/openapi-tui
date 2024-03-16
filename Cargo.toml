@@ -1,6 +1,6 @@
 [package]
 name = "openapi-tui"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "This TUI allows you to list and browse APIs described by the openapi specification."
 
@@ -36,7 +36,7 @@ log = "0.4.20"
 openapi-31 = { version = "0.4.0" }
 pretty_assertions = "1.4.0"
 ratatui = { version = "0.26.1", features = ["serde", "macros"] }
-reqwest = "0.11.26"
+reqwest = { version = "0.11.26", features = ["native-tls-vendored"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
 serde_yaml = "0.9.32"
