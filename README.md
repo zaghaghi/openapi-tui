@@ -30,8 +30,14 @@ Options:
 # open remote file
 ❯ openapi-tui -i https://raw.githubusercontent.com/github/rest-api-description/main/descriptions-next/api.github.com/api.github.com.yaml
 ```
+
+
 # Demo
 ![demo](static/demo.gif)
+
+# Other Feature Animations
+<details>
+  <summary>Show more</summary>
 
 ## Nested Components
 ![nested-refrences](static/nested-refs.gif)
@@ -45,6 +51,11 @@ Options:
 ## Filter
 ![filter](static/filter.gif)
 
+</details>
+
+<br />
+
+
 # Installation
 Install from source:
 ```bash
@@ -52,6 +63,16 @@ Install from source:
 ```
 Or download pre-built artifact from release page.
 
+## Docker
+Just run the application with docker.
+
+```bash
+# open local file
+❯ docker run --rm -ti -v$(pwd)/examples:/opt zaghaghi/openapi-tui -i /opt/petstore.json
+
+# open remote file
+❯ docker run --rm -it zaghaghi/openapi-tui -i https://raw.githubusercontent.com/github/rest-api-description/main/descriptions-next/api.github.com/api.github.com.yaml
+```
 ## Distro Packages
 
 <details>
