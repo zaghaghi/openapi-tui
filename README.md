@@ -3,7 +3,7 @@
 
 [![CI](https://github.com/zaghaghi/openapi-tui/workflows/CI/badge.svg)](https://github.com/zaghaghi/openapi-tui/actions)
 
-Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 spec.
+Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 and v3.1 spec.
 
 
 # Usage
