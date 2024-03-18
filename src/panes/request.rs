@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
-  components::schema_viewer::SchemaViewer,
+  components::schema_editor::{SchemaEditor, SchemaEditorState},
   pages::home::State,
   panes::Pane,
   tui::{EventResponse, Frame},
@@ -23,24 +23,26 @@ pub struct RequestType {
 }
 
 #[derive(Default)]
-pub struct RequestPane {
+pub struct RequestPane<'a> {
   focused: bool,
   focused_border_style: Style,
   state: Arc<RwLock<State>>,
 
   schemas: Vec<RequestType>,
   schemas_index: usize,
-  schema_viewer: SchemaViewer,
+  schema_editor: SchemaEditor<'a>,
+  schema_editor_state: SchemaEditorState<'a>,
 }
 
-impl RequestPane {
+impl RequestPane<'_> {
   pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
     Self {
       focused,
       focused_border_style,
       schemas: Vec::default(),
       schemas_index: 0,
-      schema_viewer: SchemaViewer::from(state.clone()),
+      schema_editor: SchemaEditor::new(),
+      schema_editor_state: SchemaEditorState::new(None, state.clone()).unwrap(),
       state,
     }
   }
@@ -128,15 +130,15 @@ impl RequestPane {
       }
     }
     if let Some(request_type) = self.schemas.get(self.schemas_index) {
-      self.schema_viewer.set(request_type.schema.clone())?;
+      self.schema_editor_state.set_schema(request_type.schema.clone(), self.state.clone())?;
     } else {
-      self.schema_viewer.clear();
+      self.schema_editor_state.clear();
     }
     Ok(())
   }
 
   fn nested_schema_path_line(&self) -> Line {
-    let schema_path = self.schema_viewer.schema_path();
+    let schema_path = self.schema_editor.schema_path();
     if schema_path.is_empty() {
       return Line::default();
     }
@@ -147,7 +149,7 @@ impl RequestPane {
   }
 }
 
-impl Pane for RequestPane {
+impl Pane for RequestPane<'_> {
   fn init(&mut self) -> Result<()> {
     self.init_schema()?;
     Ok(())
@@ -173,8 +175,8 @@ impl Pane for RequestPane {
     }
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
+  fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
+    self.schema_editor_state.handle_key_events(key)
   }
 
   #[allow(unused_variables)]
@@ -189,20 +191,20 @@ impl Pane for RequestPane {
         self.init_schema()?;
       },
       Action::Down => {
-        self.schema_viewer.down();
+        self.schema_editor_state.down();
       },
       Action::Up => {
-        self.schema_viewer.up();
+        self.schema_editor_state.up();
       },
       Action::Tab(index) if index < self.schemas.len().try_into()? => {
         self.schemas_index = index.try_into()?;
-        self.init_schema()?;
+        // self.init_schema()?;
       },
-      Action::Go => self.schema_viewer.go()?,
+      Action::Submit => self.schema_editor_state.submit(),
       Action::Back => {
-        if let Some(request_type) = self.schemas.get(self.schemas_index) {
-          self.schema_viewer.back(request_type.schema.clone())?;
-        }
+        // if let Some(request_type) = self.schemas.get(self.schemas_index) {
+        // self.schema_editor.back(request_type.schema.clone())?;
+        // }
       },
       _ => {},
     }
@@ -228,7 +230,7 @@ impl Pane for RequestPane {
     let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
     let mut inner = inner.inner(&inner_margin);
     inner.height = inner.height.saturating_add(1);
-    self.schema_viewer.render_widget(frame, inner);
+    frame.render_stateful_widget(self.schema_editor, inner, &mut self.schema_editor_state);
 
     frame.render_widget(
       Block::default()

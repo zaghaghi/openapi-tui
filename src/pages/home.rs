@@ -236,6 +236,12 @@ impl Page for Home {
   fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
     match self.input_mode {
       InputMode::Normal => {
+
+    if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+      if let Some(response) = pane.handle_key_events(key)? {
+        return Ok(Some(response));
+      }
+}
         let response = match key.code {
           KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => EventResponse::Stop(Action::FocusNext),
           KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),

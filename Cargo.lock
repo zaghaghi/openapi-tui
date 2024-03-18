@@ -1958,6 +1958,7 @@ dependencies = [
  "tracing-error",
  "tracing-subscriber",
  "tui-input",
+ "tui-prompts",
  "vergen",
 ]
 
@@ -3085,6 +3086,17 @@ checksum = "b3e785f863a3af4c800a2a669d0b64c879b538738e352607e2624d03f868dc01"
 dependencies = [
  "crossterm",
  "unicode-width",
+]
+
+[[package]]
+name = "tui-prompts"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24b83b48e255f374d99cf78dc97455db9454a39b5cca103e26e5f9c930210c06"
+dependencies = [
+ "crossterm",
+ "itertools",
+ "ratatui",
 ]
 
 [[package]]
