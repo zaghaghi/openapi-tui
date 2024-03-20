@@ -19,6 +19,8 @@ pub enum Action {
   Submit,
   Update,
   Tab(u32),
+  TabNext,
+  TabPrev,
   Go,
   Back,
   ToggleFullScreen,

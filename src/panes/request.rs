@@ -198,6 +198,15 @@ impl Pane for RequestPane {
         self.schemas_index = index.try_into()?;
         self.init_schema()?;
       },
+      Action::TabNext => {
+        let next_tab_index = self.schemas_index + 1;
+        self.schemas_index = if next_tab_index < self.schemas.len() { next_tab_index } else { 0 };
+        self.init_schema()?;
+      },
+      Action::TabPrev => {
+        self.schemas_index = if self.schemas_index > 0 { self.schemas_index - 1 } else { self.schemas.len() - 1 };
+        self.init_schema()?;
+      },
       Action::Go => self.schema_viewer.go()?,
       Action::Back => {
         if let Some(request_type) = self.schemas.get(self.schemas_index) {
