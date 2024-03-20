@@ -140,6 +140,8 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `↓`, `j` | Move down in lists |
 | `↑`, `k` | Move up in lists |
 | `1...9` | Move between tabs |
+| `]` | Move to next tab |
+| `[` | Move to previous tab |
 | `f` | Toggle fullscreen pane|
 | `g` | Go in nested items in lists|
 | `/` | Filter apis|

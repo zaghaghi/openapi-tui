@@ -248,6 +248,8 @@ impl Page for Home {
           KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1))
           },
+          KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
+          KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
           KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter),
           _ => {
             return Ok(None);
