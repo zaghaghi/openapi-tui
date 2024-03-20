@@ -147,20 +147,31 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `/` | Filter apis|
 | `Backspace`, `b` | Get out of nested items in lists|
 
-
-# Features
+# Implemented Features
 - [X] Viewer
 - [X] OpenAPI v3.1
 - [X] Display Webhooks
 - [X] Display Info and Version
-- [X] Search #12
-- [ ] Display Key Mappings in Popup
-- [ ] Execute 
-- [ ] Remote API specification
+- [X] Filter APIs
+- [X] Remote API specification
 - [X] Merge Parameters Based on `in`
 - [X] Pane Fullscreen Mode
 - [X] Nested Components
 - [X] Status Line
+
+
+# Next Release
+- [ ] Schema Types (openapi-31)
+- [ ] Execute 
+  - [ ] Execute Popup Pane
+  - [ ] Request Schema Editor
+  - [ ] Header Input (No Validation)
+  - [ ] Path Input (No Validation)
+  - [ ] Plain Response Viewer (Status + Headers + Body)
+
+# Backlog
+- [ ] Display Key Mappings in Popup
+- [ ] Execute 
 - [ ] Cache Schema Styles
-- [ ] Read Spec from STDIN
+- [ ] Read Spec from STDIN 
 - [ ] Command Line
