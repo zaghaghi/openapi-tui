@@ -260,21 +260,21 @@ impl Page for Home {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let verical_layout = Layout::default()
+    let vertical_layout = Layout::default()
       .direction(Direction::Vertical)
       .constraints(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)])
       .split(area);
 
-    self.static_panes[0].draw(frame, verical_layout[0])?;
-    self.static_panes[1].draw(frame, verical_layout[2])?;
+    self.static_panes[0].draw(frame, vertical_layout[0])?;
+    self.static_panes[1].draw(frame, vertical_layout[2])?;
 
     if let Some(fullscreen_pane_index) = self.fullscreen_pane_index {
-      self.panes[fullscreen_pane_index].draw(frame, verical_layout[1])?;
+      self.panes[fullscreen_pane_index].draw(frame, vertical_layout[1])?;
     } else {
       let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
-        .split(verical_layout[1]);
+        .split(vertical_layout[1]);
 
       let left_panes = Layout::default()
         .direction(Direction::Vertical)
