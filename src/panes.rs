@@ -4,7 +4,8 @@ use ratatui::layout::{Constraint, Rect};
 
 use crate::{
   action::Action,
-  tui::{EventResponse, Frame},
+  state::State,
+  tui::{Event, EventResponse, Frame},
 };
 
 pub mod address;
@@ -16,7 +17,7 @@ pub mod response;
 pub mod tags;
 
 pub trait Pane {
-  fn init(&mut self) -> Result<()> {
+  fn init(&mut self, _state: &State) -> Result<()> {
     Ok(())
   }
 
@@ -30,20 +31,26 @@ pub trait Pane {
 
   fn height_constraint(&self) -> Constraint;
 
-  #[allow(unused_variables)]
-  fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
+  fn handle_events(&mut self, event: Event, state: &mut State) -> Result<Option<EventResponse<Action>>> {
+    let r = match event {
+      Event::Key(key_event) => self.handle_key_events(key_event, state)?,
+      Event::Mouse(mouse_event) => self.handle_mouse_events(mouse_event, state)?,
+      _ => None,
+    };
+    Ok(r)
+  }
+
+  fn handle_key_events(&mut self, _key: KeyEvent, _state: &mut State) -> Result<Option<EventResponse<Action>>> {
     Ok(None)
   }
 
-  #[allow(unused_variables)]
-  fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<EventResponse<Action>>> {
+  fn handle_mouse_events(&mut self, _mouse: MouseEvent, _state: &mut State) -> Result<Option<EventResponse<Action>>> {
     Ok(None)
   }
 
-  #[allow(unused_variables)]
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, _action: Action, _state: &mut State) -> Result<Option<Action>> {
     Ok(None)
   }
 
-  fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()>;
+  fn draw(&mut self, f: &mut Frame<'_>, area: Rect, state: &State) -> Result<()>;
 }

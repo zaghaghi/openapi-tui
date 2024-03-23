@@ -1,8 +1,5 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use openapi_31::v31::{Openapi, Operation};
 use ratatui::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -10,155 +7,45 @@ use crate::{
   action::Action,
   config::Config,
   pages::Page,
-  panes::{
-    address::AddressPane, apis::ApisPane, footer::FooterPane, header::HeaderPane, request::RequestPane,
-    response::ResponsePane, tags::TagsPane, Pane,
-  },
+  panes::{address::AddressPane, apis::ApisPane, request::RequestPane, response::ResponsePane, tags::TagsPane, Pane},
+  state::{InputMode, State},
   tui::EventResponse,
 };
-
-#[derive(Default)]
-pub enum InputMode {
-  #[default]
-  Normal,
-  Insert,
-}
-
-pub enum OperationItemType {
-  Path,
-  Webhook,
-}
-pub struct OperationItem {
-  pub path: String,
-  pub method: String,
-  pub operation: Operation,
-  pub r#type: OperationItemType,
-}
-
-impl OperationItem {
-  pub fn has_tag(&self, tag: &String) -> bool {
-    self.operation.tags.as_ref().map_or(false, |tags| tags.contains(tag))
-  }
-}
-
-#[derive(Default)]
-pub struct State {
-  pub openapi_path: String,
-  pub openapi_spec: Openapi,
-  pub openapi_operations: Vec<OperationItem>,
-  pub active_operation_index: usize,
-  pub active_tag_name: Option<String>,
-  pub active_filter: String,
-}
-
-impl State {
-  pub fn active_operation(&self) -> Option<&OperationItem> {
-    if let Some(active_tag) = &self.active_tag_name {
-      self
-        .openapi_operations
-        .iter()
-        .filter(|flat_operation| {
-          flat_operation.has_tag(active_tag) && flat_operation.path.contains(self.active_filter.as_str())
-        })
-        .nth(self.active_operation_index)
-    } else {
-      self
-        .openapi_operations
-        .iter()
-        .filter(|flat_operation| flat_operation.path.contains(self.active_filter.as_str()))
-        .nth(self.active_operation_index)
-    }
-  }
-
-  pub fn operations_len(&self) -> usize {
-    if let Some(active_tag) = &self.active_tag_name {
-      self
-        .openapi_operations
-        .iter()
-        .filter(|item| item.has_tag(active_tag) && item.path.contains(self.active_filter.as_str()))
-        .count()
-    } else {
-      self
-        .openapi_operations
-        .iter()
-        .filter(|flat_operation| flat_operation.path.contains(self.active_filter.as_str()))
-        .count()
-    }
-  }
-}
 
 #[derive(Default)]
 pub struct Home {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   panes: Vec<Box<dyn Pane>>,
-  static_panes: Vec<Box<dyn Pane>>,
   focused_pane_index: usize,
-  #[allow(dead_code)]
-  state: Arc<RwLock<State>>,
   fullscreen_pane_index: Option<usize>,
-  input_mode: InputMode,
 }
 
 impl Home {
-  pub async fn new(openapi_path: String) -> Result<Self> {
-    let openapi_spec = if let Ok(url) = reqwest::Url::parse(openapi_path.as_str()) {
-      let resp: String = reqwest::get(url.clone()).await?.text().await?;
-      let mut spec = serde_yaml::from_str::<Openapi>(resp.as_str())?;
-      if spec.servers.is_none() {
-        let origin = url.origin().ascii_serialization();
-        spec.servers = Some(vec![openapi_31::v31::Server::new(format!("{}/", origin))]);
-      }
-      spec
-    } else {
-      tokio::fs::read_to_string(&openapi_path)
-        .await
-        .map(|content| serde_yaml::from_str::<Openapi>(content.as_str()))??
-    };
-
-    let openapi_operations = openapi_spec
-      .into_operations()
-      .map(|(path, method, operation)| {
-        if path.starts_with('/') {
-          OperationItem { path, method, operation, r#type: OperationItemType::Path }
-        } else {
-          OperationItem { path, method, operation, r#type: OperationItemType::Webhook }
-        }
-      })
-      .collect::<Vec<_>>();
-    let state = Arc::new(RwLock::new(State {
-      openapi_spec,
-      openapi_path,
-      openapi_operations,
-      active_operation_index: 0,
-      active_tag_name: None,
-      active_filter: String::default(),
-    }));
+  pub fn new() -> Result<Self> {
     let focused_border_style = Style::default().fg(Color::LightGreen);
 
     Ok(Self {
       command_tx: None,
       config: Config::default(),
       panes: vec![
-        Box::new(ApisPane::new(state.clone(), true, focused_border_style)),
-        Box::new(TagsPane::new(state.clone(), false, focused_border_style)),
-        Box::new(AddressPane::new(state.clone(), false, focused_border_style)),
-        Box::new(RequestPane::new(state.clone(), false, focused_border_style)),
-        Box::new(ResponsePane::new(state.clone(), false, focused_border_style)),
+        Box::new(ApisPane::new(true, focused_border_style)),
+        Box::new(TagsPane::new(false, focused_border_style)),
+        Box::new(AddressPane::new(false, focused_border_style)),
+        Box::new(RequestPane::new(false, focused_border_style)),
+        Box::new(ResponsePane::new(false, focused_border_style)),
       ],
-      static_panes: vec![Box::new(HeaderPane::new(state.clone())), Box::new(FooterPane::new(state.clone()))],
+
       focused_pane_index: 0,
-      state,
       fullscreen_pane_index: None,
-      input_mode: InputMode::Normal,
     })
   }
 }
 
 impl Page for Home {
-  fn init(&mut self) -> Result<()> {
+  fn init(&mut self, state: &State) -> Result<()> {
     for pane in self.panes.iter_mut() {
-      pane.init()?;
+      pane.init(state)?;
     }
     Ok(())
   }
@@ -173,7 +60,7 @@ impl Page for Home {
     Ok(())
   }
 
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Tick => {},
       Action::FocusNext => {
@@ -198,7 +85,7 @@ impl Page for Home {
       },
       Action::Update => {
         for pane in self.panes.iter_mut() {
-          pane.update(action.clone())?;
+          pane.update(action.clone(), state)?;
         }
       },
       Action::ToggleFullScreen => {
@@ -208,33 +95,27 @@ impl Page for Home {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.unfocus()?;
         }
-        self.static_panes[1].focus()?;
-        self.input_mode = InputMode::Insert;
       },
       Action::Filter(filter) => {
-        self.static_panes[1].unfocus()?;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.focus()?;
         }
-        self.input_mode = InputMode::Normal;
-        {
-          let mut state = self.state.write().unwrap();
-          state.active_operation_index = 0;
-          state.active_filter = filter;
-        }
+        state.active_operation_index = 0;
+        state.active_filter = filter;
+
         return Ok(Some(Action::Update));
       },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          return pane.update(action);
+          return pane.update(action, state);
         }
       },
     }
     Ok(None)
   }
 
-  fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    match self.input_mode {
+  fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
+    match state.input_mode {
       InputMode::Normal => {
         let response = match key.code {
           KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => EventResponse::Stop(Action::FocusNext),
@@ -257,26 +138,18 @@ impl Page for Home {
         };
         Ok(Some(response))
       },
-      InputMode::Insert => self.static_panes[1].handle_key_events(key),
+      InputMode::Insert => Ok(None),
     }
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let verical_layout = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)])
-      .split(area);
-
-    self.static_panes[0].draw(frame, verical_layout[0])?;
-    self.static_panes[1].draw(frame, verical_layout[2])?;
-
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     if let Some(fullscreen_pane_index) = self.fullscreen_pane_index {
-      self.panes[fullscreen_pane_index].draw(frame, verical_layout[1])?;
+      self.panes[fullscreen_pane_index].draw(frame, area, state)?;
     } else {
       let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
-        .split(verical_layout[1]);
+        .split(area);
 
       let left_panes = Layout::default()
         .direction(Direction::Vertical)
@@ -292,11 +165,11 @@ impl Page for Home {
         ])
         .split(outer_layout[1]);
 
-      self.panes[0].draw(frame, left_panes[0])?;
-      self.panes[1].draw(frame, left_panes[1])?;
-      self.panes[2].draw(frame, right_panes[0])?;
-      self.panes[3].draw(frame, right_panes[1])?;
-      self.panes[4].draw(frame, right_panes[2])?;
+      self.panes[0].draw(frame, left_panes[0], state)?;
+      self.panes[1].draw(frame, left_panes[1], state)?;
+      self.panes[2].draw(frame, right_panes[0], state)?;
+      self.panes[3].draw(frame, right_panes[1], state)?;
+      self.panes[4].draw(frame, right_panes[2], state)?;
     }
     Ok(())
   }

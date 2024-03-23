@@ -1,7 +1,4 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
@@ -9,21 +6,20 @@ use ratatui::{
 
 use crate::{
   action::Action,
-  pages::home::{OperationItemType, State},
   panes::Pane,
-  tui::{EventResponse, Frame},
+  state::{OperationItemType, State},
+  tui::Frame,
 };
 
 pub struct ApisPane {
   focused: bool,
   focused_border_style: Style,
-  state: Arc<RwLock<State>>,
   current_operation_index: usize,
 }
 
 impl ApisPane {
-  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
-    Self { focused, focused_border_style, state, current_operation_index: 0 }
+  pub fn new(focused: bool, focused_border_style: Style) -> Self {
+    Self { focused, focused_border_style, current_operation_index: 0 }
   }
 
   fn border_style(&self) -> Style {
@@ -51,10 +47,6 @@ impl ApisPane {
   }
 }
 impl Pane for ApisPane {
-  fn init(&mut self) -> Result<()> {
-    Ok(())
-  }
-
   fn focus(&mut self) -> Result<()> {
     self.focused = true;
     Ok(())
@@ -72,19 +64,9 @@ impl Pane for ApisPane {
     }
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  #[allow(unused_variables)]
-  fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Down => {
-        let mut state = self.state.write().unwrap();
         let operations_len = state.operations_len();
         if operations_len > 0 {
           self.current_operation_index = self.current_operation_index.saturating_add(1) % operations_len;
@@ -93,7 +75,6 @@ impl Pane for ApisPane {
         return Ok(Some(Action::Update));
       },
       Action::Up => {
-        let mut state = self.state.write().unwrap();
         let operations_len = state.operations_len();
         if operations_len > 0 {
           self.current_operation_index =
@@ -104,7 +85,6 @@ impl Pane for ApisPane {
       },
       Action::Submit => {},
       Action::Update => {
-        let state = self.state.read().unwrap();
         self.current_operation_index = state.active_operation_index;
       },
       _ => {},
@@ -113,8 +93,7 @@ impl Pane for ApisPane {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let state = self.state.read().unwrap();
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     let items = state.openapi_operations.iter().filter_map(|operation_item| {
       if let Some(active_tag) = &state.active_tag_name {
         if !operation_item.has_tag(active_tag) {

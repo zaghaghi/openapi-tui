@@ -1,5 +1,3 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::Paragraph};
@@ -7,22 +5,20 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
   action::Action,
-  pages::home::State,
   panes::Pane,
+  state::{InputMode, State},
   tui::{EventResponse, Frame},
 };
 
 #[derive(Default)]
 pub struct FooterPane {
   focused: bool,
-  #[allow(dead_code)]
-  state: Arc<RwLock<State>>,
   input: Input,
 }
 
 impl FooterPane {
-  pub fn new(state: Arc<RwLock<State>>) -> Self {
-    Self { focused: false, state, input: Input::default() }
+  pub fn new() -> Self {
+    Self { focused: false, input: Input::default() }
   }
 }
 
@@ -41,24 +37,38 @@ impl Pane for FooterPane {
     Constraint::Max(1)
   }
 
-  fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    self.input.handle_event(&Event::Key(key));
-    let response = match key.code {
-      KeyCode::Enter => Some(EventResponse::Stop(Action::Filter(self.input.to_string()))),
-      KeyCode::Esc => {
-        let filter: String;
-        {
-          let state = self.state.read().unwrap();
-          filter = state.active_filter.clone();
-        }
-        Some(EventResponse::Stop(Action::Filter(filter)))
+  fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
+    match state.input_mode {
+      InputMode::Normal => Ok(None),
+      InputMode::Insert => {
+        self.input.handle_event(&Event::Key(key));
+        let response = match key.code {
+          KeyCode::Enter => Some(EventResponse::Stop(Action::Filter(self.input.to_string()))),
+          KeyCode::Esc => Some(EventResponse::Stop(Action::Filter(state.active_filter.clone()))),
+          _ => None,
+        };
+        Ok(response)
       },
-      _ => Some(EventResponse::Stop(Action::Noop)),
-    };
-    Ok(response)
+    }
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
+    match action {
+      Action::FocusFooter => {
+        self.focus()?;
+        state.input_mode = InputMode::Insert;
+        Ok(Some(Action::Update))
+      },
+      Action::Filter(_) => {
+        state.input_mode = InputMode::Normal;
+        self.unfocus()?;
+        Ok(Some(Action::Update))
+      },
+      _ => Ok(None),
+    }
+  }
+
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
     if self.focused {
       let search_label = "Filter: ";

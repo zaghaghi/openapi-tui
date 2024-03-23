@@ -1,17 +1,13 @@
-use std::{
-  collections::HashMap,
-  sync::{Arc, RwLock},
-};
+use std::collections::HashMap;
 
 use color_eyre::eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use syntect::{easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings};
 
-use crate::pages::home::State;
+use crate::state::State;
 
 const SYNTAX_THEME: &str = "Solarized (dark)";
 
-#[derive(Default)]
 pub struct SchemaViewer {
   components: HashMap<String, serde_json::Value>,
   styles: Vec<Vec<(Style, String)>>,
@@ -24,10 +20,10 @@ pub struct SchemaViewer {
   highlighter_theme_set: ThemeSet,
 }
 
-impl SchemaViewer {
-  pub fn new(components: HashMap<String, serde_json::Value>) -> Self {
+impl Default for SchemaViewer {
+  fn default() -> Self {
     Self {
-      components,
+      components: HashMap::default(),
       styles: Vec::default(),
       line_offset: 0,
       name_history: Vec::default(),
@@ -36,10 +32,16 @@ impl SchemaViewer {
       highlighter_theme_set: ThemeSet::load_defaults(),
     }
   }
+}
 
-  pub fn from(state: Arc<RwLock<State>>) -> Self {
-    let state_reader = state.read().unwrap();
-    Self::new(HashMap::from_iter(state_reader.openapi_spec.components.as_deref().unwrap().schemas.clone().unwrap()))
+impl SchemaViewer {
+  pub fn set_components(&mut self, state: &State) {
+    self.components = HashMap::default();
+    if let Some(components) = &state.openapi_spec.components {
+      if let Some(schemas) = &components.schemas {
+        self.components = HashMap::from_iter(schemas.clone());
+      }
+    }
   }
 
   pub fn clear(&mut self) {
