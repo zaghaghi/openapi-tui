@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use crate::{
   action::Action,
   config::Config,
-  pages::{home::Home, Page},
+  pages::{home::Home, phone::Phone, Page},
   panes::{footer::FooterPane, header::HeaderPane, Pane},
   state::State,
   tui,
@@ -170,9 +170,21 @@ impl App {
               })
             })?;
           },
+          Action::NewCall => {
+            if let Some(operation_item) = self.state.active_operation() {
+              if let Ok(page) = Phone::new(operation_item.clone()) {
+                self.pages.insert(0, Box::new(page));
+              }
+            }
+          },
+          Action::HangUp => {
+            if self.pages.len() > 1 {
+              self.pages.remove(0);
+            }
+          },
           _ => {},
         }
-        for page in self.pages.iter_mut() {
+        if let Some(page) = self.pages.get_mut(self.active_page) {
           if let Some(action) = page.update(action.clone(), &mut self.state)? {
             action_tx.send(action)?
           };

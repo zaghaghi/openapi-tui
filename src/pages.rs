@@ -9,7 +9,9 @@ use crate::{
   state::State,
   tui::{Event, EventResponse, Frame},
 };
+
 pub mod home;
+pub mod phone;
 
 pub trait Page {
   #[allow(unused_variables)]

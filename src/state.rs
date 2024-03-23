@@ -12,11 +12,14 @@ pub struct State {
   pub input_mode: InputMode,
 }
 
+#[derive(Debug, Default, Clone)]
 pub enum OperationItemType {
+  #[default]
   Path,
   Webhook,
 }
 
+#[derive(Debug, Default, Clone)]
 pub struct OperationItem {
   pub path: String,
   pub method: String,

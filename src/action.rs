@@ -27,4 +27,6 @@ pub enum Action {
   FocusFooter,
   Filter(String),
   Noop,
+  NewCall,
+  HangUp,
 }

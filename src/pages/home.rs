@@ -132,6 +132,7 @@ impl Page for Home {
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
           KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter),
+          KeyCode::Char('e') | KeyCode::Char('E') => EventResponse::Stop(Action::NewCall),
           _ => {
             return Ok(None);
           },
