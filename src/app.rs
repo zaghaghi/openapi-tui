@@ -12,7 +12,7 @@ use crate::{
   config::Config,
   pages::{home::Home, phone::Phone, Page},
   panes::{footer::FooterPane, header::HeaderPane, Pane},
-  state::State,
+  state::{OperationItemType, State},
   tui,
 };
 
@@ -172,8 +172,11 @@ impl App {
           },
           Action::NewCall => {
             if let Some(operation_item) = self.state.active_operation() {
-              if let Ok(page) = Phone::new(operation_item.clone()) {
-                self.pages.insert(0, Box::new(page));
+              if let OperationItemType::Path = operation_item.r#type {
+                if let Ok(mut page) = Phone::new(operation_item.clone()) {
+                  page.init(&self.state)?;
+                  self.pages.insert(0, Box::new(page));
+                }
               }
             }
           },
