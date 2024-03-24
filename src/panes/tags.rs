@@ -1,30 +1,21 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
 
-use crate::{
-  action::Action,
-  pages::home::State,
-  panes::Pane,
-  tui::{EventResponse, Frame},
-};
+use crate::{action::Action, panes::Pane, state::State, tui::Frame};
 
 #[derive(Default)]
 pub struct TagsPane {
   focused: bool,
   focused_border_style: Style,
-  state: Arc<RwLock<State>>,
   current_tag_index: usize,
 }
 
 impl TagsPane {
-  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
-    Self { focused, focused_border_style, state, current_tag_index: 0 }
+  pub fn new(focused: bool, focused_border_style: Style) -> Self {
+    Self { focused, focused_border_style, current_tag_index: 0 }
   }
 
   fn border_style(&self) -> Style {
@@ -41,8 +32,7 @@ impl TagsPane {
     }
   }
 
-  fn update_active_tag(&mut self) {
-    let mut state = self.state.write().unwrap();
+  fn update_active_tag(&mut self, state: &mut State) {
     if self.current_tag_index > 0 {
       if let Some(tag) = state.openapi_spec.tags.as_ref().into_iter().flatten().nth(self.current_tag_index - 1) {
         state.active_tag_name = Some(tag.name.clone());
@@ -54,11 +44,8 @@ impl TagsPane {
     }
   }
 }
-impl Pane for TagsPane {
-  fn init(&mut self) -> Result<()> {
-    Ok(())
-  }
 
+impl Pane for TagsPane {
   fn focus(&mut self) -> Result<()> {
     self.focused = true;
     Ok(())
@@ -76,37 +63,26 @@ impl Pane for TagsPane {
     }
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  #[allow(unused_variables)]
-  fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Down => {
         {
-          let state = self.state.read().unwrap();
           let tags_list_len = state.openapi_spec.tags.as_ref().into_iter().flatten().count().saturating_add(1);
           if tags_list_len > 0 {
             self.current_tag_index = self.current_tag_index.saturating_add(1) % tags_list_len;
           }
         }
-        self.update_active_tag();
+        self.update_active_tag(state);
         return Ok(Some(Action::Update));
       },
       Action::Up => {
         {
-          let state = self.state.read().unwrap();
           let tags_list_len = state.openapi_spec.tags.as_ref().into_iter().flatten().count().saturating_add(1);
           if tags_list_len > 0 {
             self.current_tag_index = self.current_tag_index.saturating_add(tags_list_len - 1) % tags_list_len;
           }
         }
-        self.update_active_tag();
+        self.update_active_tag(state);
         return Ok(Some(Action::Update));
       },
       Action::Submit => {},
@@ -116,8 +92,7 @@ impl Pane for TagsPane {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let state = self.state.read().unwrap();
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     let mut items: Vec<Line<'_>> = state
       .openapi_spec
       .tags

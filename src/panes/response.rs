@@ -1,19 +1,10 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
 
-use crate::{
-  action::Action,
-  components::schema_viewer::SchemaViewer,
-  pages::home::State,
-  panes::Pane,
-  tui::{EventResponse, Frame},
-};
+use crate::{action::Action, components::schema_viewer::SchemaViewer, panes::Pane, state::State, tui::Frame};
 
 pub struct ResponseType {
   status: String,
@@ -25,7 +16,6 @@ pub struct ResponseType {
 pub struct ResponsePane {
   focused: bool,
   focused_border_style: Style,
-  state: Arc<RwLock<State>>,
 
   schemas: Vec<ResponseType>,
   schemas_index: usize,
@@ -33,14 +23,13 @@ pub struct ResponsePane {
 }
 
 impl ResponsePane {
-  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
+  pub fn new(focused: bool, focused_border_style: Style) -> Self {
     Self {
       focused,
       focused_border_style,
       schemas: Vec::default(),
       schemas_index: 0,
-      schema_viewer: SchemaViewer::from(state.clone()),
-      state,
+      schema_viewer: SchemaViewer::default(),
     }
   }
 
@@ -85,9 +74,8 @@ impl ResponsePane {
     Line::from(line)
   }
 
-  fn init_schema(&mut self) -> Result<()> {
+  fn init_schema(&mut self, state: &State) -> Result<()> {
     {
-      let state = self.state.read().unwrap();
       self.schemas = vec![];
 
       if let Some(operation_item) = state.active_operation() {
@@ -129,8 +117,9 @@ impl ResponsePane {
 }
 
 impl Pane for ResponsePane {
-  fn init(&mut self) -> Result<()> {
-    self.init_schema()?;
+  fn init(&mut self, state: &State) -> Result<()> {
+    self.schema_viewer.set_components(state);
+    self.init_schema(state)?;
     Ok(())
   }
 
@@ -155,20 +144,11 @@ impl Pane for ResponsePane {
     }
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  #[allow(unused_variables)]
-  fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {
         self.schemas_index = 0;
-        self.init_schema()?;
+        self.init_schema(state)?;
       },
       Action::Down => {
         self.schema_viewer.down();
@@ -178,16 +158,16 @@ impl Pane for ResponsePane {
       },
       Action::Tab(index) if index < self.schemas.len().try_into()? => {
         self.schemas_index = index.try_into()?;
-        self.init_schema()?;
+        self.init_schema(state)?;
       },
       Action::TabNext => {
         let next_tab_index = self.schemas_index + 1;
         self.schemas_index = if next_tab_index < self.schemas.len() { next_tab_index } else { 0 };
-        self.init_schema()?;
+        self.init_schema(state)?;
       },
       Action::TabPrev => {
         self.schemas_index = if self.schemas_index > 0 { self.schemas_index - 1 } else { self.schemas.len() - 1 };
-        self.init_schema()?;
+        self.init_schema(state)?;
       },
       Action::Go => self.schema_viewer.go()?,
       Action::Back => {
@@ -201,7 +181,7 @@ impl Pane for ResponsePane {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
     let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
 
     let inner = area.inner(&inner_margin);

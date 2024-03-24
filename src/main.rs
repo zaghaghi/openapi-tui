@@ -5,6 +5,7 @@ pub mod components;
 pub mod config;
 pub mod pages;
 pub mod panes;
+pub mod state;
 pub mod tui;
 pub mod utils;
 

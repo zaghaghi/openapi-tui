@@ -1,18 +1,14 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
 use ratatui::prelude::*;
 
-use crate::{pages::home::State, panes::Pane, tui::Frame};
+use crate::{panes::Pane, state::State, tui::Frame};
 
 #[derive(Default)]
-pub struct HeaderPane {
-  state: Arc<RwLock<State>>,
-}
+pub struct HeaderPane {}
 
 impl HeaderPane {
-  pub fn new(state: Arc<RwLock<State>>) -> Self {
-    Self { state }
+  pub fn new() -> Self {
+    Self {}
   }
 }
 
@@ -21,8 +17,7 @@ impl Pane for HeaderPane {
     Constraint::Max(1)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let state = self.state.read().unwrap();
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     frame.render_widget(
       Line::from(vec![
         Span::styled(

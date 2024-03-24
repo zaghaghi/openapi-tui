@@ -1,7 +1,4 @@
-use std::sync::{Arc, RwLock};
-
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
@@ -9,21 +6,20 @@ use ratatui::{
 
 use crate::{
   action::Action,
-  pages::home::{OperationItemType, State},
   panes::Pane,
-  tui::{EventResponse, Frame},
+  state::{OperationItemType, State},
+  tui::Frame,
 };
 
 #[derive(Default)]
 pub struct AddressPane {
   focused: bool,
   focused_border_style: Style,
-  state: Arc<RwLock<State>>,
 }
 
 impl AddressPane {
-  pub fn new(state: Arc<RwLock<State>>, focused: bool, focused_border_style: Style) -> Self {
-    Self { state, focused, focused_border_style }
+  pub fn new(focused: bool, focused_border_style: Style) -> Self {
+    Self { focused, focused_border_style }
   }
 
   fn border_style(&self) -> Style {
@@ -51,10 +47,6 @@ impl AddressPane {
   }
 }
 impl Pane for AddressPane {
-  fn init(&mut self) -> Result<()> {
-    Ok(())
-  }
-
   fn focus(&mut self) -> Result<()> {
     self.focused = true;
     Ok(())
@@ -69,16 +61,7 @@ impl Pane for AddressPane {
     Constraint::Max(3)
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  #[allow(unused_variables)]
-  fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<EventResponse<Action>>> {
-    Ok(None)
-  }
-
-  fn update(&mut self, action: Action) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {},
       Action::Submit => {},
@@ -87,8 +70,7 @@ impl Pane for AddressPane {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect) -> Result<()> {
-    let state = self.state.read().unwrap();
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     if let Some(operation_item) = state.active_operation() {
       let base_url = if let Some(server) = state.openapi_spec.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
         String::from(server.url.trim_end_matches('/'))
