@@ -12,7 +12,7 @@ use crate::{
   config::Config,
   pages::{home::Home, phone::Phone, Page},
   panes::{footer::FooterPane, header::HeaderPane, Pane},
-  state::{OperationItemType, State},
+  state::{InputMode, OperationItemType, State},
   tui,
 };
 
@@ -119,7 +119,7 @@ impl App {
 
         if !stop_event_propagation {
           match e {
-            tui::Event::Quit => action_tx.send(Action::Quit)?,
+            tui::Event::Quit if self.state.input_mode == InputMode::Normal => action_tx.send(Action::Quit)?,
             tui::Event::Tick => action_tx.send(Action::Tick)?,
             tui::Event::Render => action_tx.send(Action::Render)?,
             tui::Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
@@ -152,7 +152,7 @@ impl App {
           Action::Tick => {
             self.last_tick_key_events.drain(..);
           },
-          Action::Quit => self.should_quit = true,
+          Action::Quit if self.state.input_mode == InputMode::Normal => self.should_quit = true,
           Action::Suspend => self.should_suspend = true,
           Action::Resume => self.should_suspend = false,
           Action::Resize(w, h) => {

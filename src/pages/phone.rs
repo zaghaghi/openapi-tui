@@ -14,7 +14,7 @@ use crate::{
   pages::Page,
   panes::{parameter_editor::ParameterEditor, Pane},
   state::{InputMode, OperationItem, State},
-  tui::EventResponse,
+  tui::{Event, EventResponse},
 };
 
 #[derive(Default)]
@@ -104,7 +104,21 @@ impl Page for Phone {
       InputMode::Insert => {
         let response = match key.code {
           KeyCode::Enter => EventResponse::Stop(Action::Submit),
-          _ => return Ok(None),
+          _ => {
+            for pane in self.panes.iter_mut() {
+              let response = pane.handle_events(Event::Key(key), state)?;
+              match response {
+                Some(EventResponse::Stop(_)) => return Ok(response),
+                Some(EventResponse::Continue(action)) => {
+                  if let Some(tx) = &self.command_tx {
+                    tx.send(action)?;
+                  }
+                },
+                _ => {},
+              }
+            }
+            return Ok(None);
+          },
         };
         Ok(Some(response))
       },
@@ -118,7 +132,6 @@ impl Page for Phone {
           pane.update(action.clone(), state)?;
         }
       },
-      Action::Submit => {},
 
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {

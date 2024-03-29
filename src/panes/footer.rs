@@ -68,12 +68,15 @@ impl Pane for FooterPane {
     }
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
     if self.focused {
+      let mut area = area;
+      area.width = area.width.saturating_sub(4);
+
       let search_label = "Filter: ";
       let width = area.width.max(3);
-      let scroll = self.input.visual_scroll(width as usize);
+      let scroll = self.input.visual_scroll(width as usize - search_label.len());
       let input = Paragraph::new(Line::from(vec![
         Span::styled(search_label, Style::default().fg(Color::LightBlue)),
         Span::styled(self.input.value(), Style::default()),
@@ -94,6 +97,15 @@ impl Pane for FooterPane {
         area,
       );
     }
+    frame.render_widget(
+      Line::from(vec![match state.input_mode {
+        InputMode::Normal => Span::from("[N]"),
+        InputMode::Insert => Span::from("[I]"),
+      }])
+      .right_aligned(),
+      area,
+    );
+
     Ok(())
   }
 }

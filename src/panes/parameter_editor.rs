@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
+use crossterm::event::{Event, KeyEvent};
 use openapi_31::v31::parameter::In;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
+use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
   action::Action,
   panes::Pane,
-  state::{OperationItem, State},
-  tui::Frame,
+  state::{InputMode, OperationItem, State},
+  tui::{EventResponse, Frame},
 };
 
 pub struct ParameterEditor {
@@ -20,6 +22,7 @@ pub struct ParameterEditor {
   operation_item: Arc<OperationItem>,
   parameters: Vec<ParameterTab>,
   selected_parameter: usize,
+  input: Input,
 }
 
 #[derive(Default)]
@@ -39,7 +42,14 @@ pub struct ParameterTab {
 
 impl ParameterEditor {
   pub fn new(operation_item: Arc<OperationItem>, focused: bool, focused_border_style: Style) -> Self {
-    Self { operation_item, focused, focused_border_style, parameters: vec![], selected_parameter: 0 }
+    Self {
+      operation_item,
+      focused,
+      focused_border_style,
+      parameters: vec![],
+      selected_parameter: 0,
+      input: Input::default(),
+    }
   }
 
   fn border_style(&self) -> Style {
@@ -150,7 +160,17 @@ impl Pane for ParameterEditor {
     Constraint::Fill(1)
   }
 
-  fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
+  fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
+    match state.input_mode {
+      InputMode::Normal => Ok(None),
+      InputMode::Insert => {
+        self.input.handle_event(&Event::Key(key));
+        Ok(None)
+      },
+    }
+  }
+
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {},
       Action::Down => {
@@ -195,13 +215,38 @@ impl Pane for ParameterEditor {
           if self.selected_parameter > 0 { self.selected_parameter - 1 } else { self.parameters.len() - 1 };
       },
 
-      Action::Submit => {},
+      Action::Submit if state.input_mode == InputMode::Normal => {
+        state.input_mode = InputMode::Insert;
+        if let Some(parameter) = self
+          .parameters
+          .get(self.selected_parameter)
+          .and_then(|parameters| parameters.table_state.selected().and_then(|i| parameters.items.get(i)))
+        {
+          self.input = self.input.clone().with_value(parameter.value.clone().unwrap_or_default());
+        }
+      },
+      Action::Submit if state.input_mode == InputMode::Insert => {
+        state.input_mode = InputMode::Normal;
+
+        if let Some(parameter) = self
+          .parameters
+          .get_mut(self.selected_parameter)
+          .and_then(|parameters| parameters.table_state.selected().and_then(|i| parameters.items.get_mut(i)))
+        {
+          if !self.input.value().is_empty() {
+            parameter.value = Some(self.input.value().to_string());
+          } else {
+            parameter.value = None;
+          }
+        }
+        self.input.reset();
+      },
       _ => {},
     }
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
 
@@ -217,7 +262,7 @@ impl Pane for ParameterEditor {
 
     let inner = Rect { x: inner.x, y: inner.y + 1, width: inner.width, height: inner.height - 1 };
 
-    if let Some(parameters) = self.parameters.get_mut(self.selected_parameter).as_mut() {
+    if let Some(parameters) = self.parameters.get_mut(self.selected_parameter) {
       let rows = parameters.items.iter().map(|item| {
         let required = match item.required {
           true => " * ",
@@ -232,12 +277,28 @@ impl Pane for ParameterEditor {
           Cell::from(Line::from(vec![Span::from(symbols::line::VERTICAL), value])),
         ])
       });
-      let table = Table::new(rows, [Constraint::Fill(1), Constraint::Fill(2)])
+      let row_widths = [Constraint::Fill(1), Constraint::Fill(2)];
+      let column_widths = Layout::horizontal(row_widths).split(inner);
+      let table = Table::new(rows, row_widths)
         .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
         .highlight_spacing(HighlightSpacing::Always)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
       frame.render_stateful_widget(table, inner, &mut parameters.table_state);
+      if let InputMode::Insert = state.input_mode {
+        if let Some(selected) = parameters.table_state.selected() {
+          let input_area = Rect {
+            x: inner.x + column_widths.first().unwrap_or(&Rect { x: 0, y: 0, width: 0, height: 0 }).width + 2,
+            y: inner.y + selected.saturating_sub(parameters.table_state.offset()) as u16,
+            width: 10,
+            height: 1,
+          };
+          frame.set_cursor(input_area.x, input_area.y);
+          let input =
+            Paragraph::new(Line::from(vec![Span::styled(self.input.value(), Style::default().fg(Color::LightBlue))]));
+          frame.render_widget(input, input_area);
+        }
+      }
     }
 
     frame.render_widget(

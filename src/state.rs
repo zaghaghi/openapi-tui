@@ -27,7 +27,7 @@ pub struct OperationItem {
   pub r#type: OperationItemType,
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub enum InputMode {
   #[default]
   Normal,
