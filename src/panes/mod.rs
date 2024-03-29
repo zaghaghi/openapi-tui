@@ -12,6 +12,7 @@ pub mod address;
 pub mod apis;
 pub mod footer;
 pub mod header;
+pub mod parameter_editor;
 pub mod request;
 pub mod response;
 pub mod tags;
