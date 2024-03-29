@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
@@ -25,6 +27,7 @@ pub enum Mode {
 pub struct App {
   pub config: Config,
   pub pages: Vec<Box<dyn Page>>,
+  pub history: HashMap<String, Box<dyn Page>>,
   pub active_page: usize,
   pub footer: FooterPane,
   pub header: HeaderPane,
@@ -44,6 +47,7 @@ impl App {
 
     Ok(Self {
       pages: vec![Box::new(home)],
+      history: HashMap::default(),
       active_page: 0,
       footer: FooterPane::new(),
       header: HeaderPane::new(),
@@ -173,16 +177,26 @@ impl App {
           Action::NewCall => {
             if let Some(operation_item) = self.state.active_operation() {
               if let OperationItemType::Path = operation_item.r#type {
-                if let Ok(mut page) = Phone::new(operation_item.clone()) {
+                if let Some(page) = operation_item
+                  .operation
+                  .operation_id
+                  .clone()
+                  .and_then(|operation_id| self.history.remove(&operation_id))
+                {
+                  self.pages.insert(0, page);
+                } else if let Ok(mut page) = Phone::new(operation_item.clone()) {
                   page.init(&self.state)?;
                   self.pages.insert(0, Box::new(page));
                 }
               }
             }
           },
-          Action::HangUp => {
+          Action::HangUp(ref operation_id) => {
             if self.pages.len() > 1 {
-              self.pages.remove(0);
+              let page = self.pages.remove(0);
+              if let Some(operation_id) = operation_id {
+                self.history.insert(operation_id.clone(), page);
+              }
             }
           },
           _ => {},

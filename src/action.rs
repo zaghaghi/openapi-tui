@@ -28,5 +28,5 @@ pub enum Action {
   Filter(String),
   Noop,
   NewCall,
-  HangUp,
+  HangUp(Option<String>),
 }

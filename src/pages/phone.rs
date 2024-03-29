@@ -84,7 +84,7 @@ impl Page for Phone {
     match state.input_mode {
       InputMode::Normal => {
         let response = match key.code {
-          KeyCode::Esc => EventResponse::Stop(Action::HangUp),
+          KeyCode::Esc => EventResponse::Stop(Action::HangUp(self.operation_item.operation.operation_id.clone())),
           KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => EventResponse::Stop(Action::FocusNext),
           KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),
           KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
