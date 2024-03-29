@@ -263,7 +263,8 @@ impl Pane for ParameterEditor {
     let inner = Rect { x: inner.x, y: inner.y + 1, width: inner.width, height: inner.height - 1 };
 
     if let Some(parameters) = self.parameters.get_mut(self.selected_parameter) {
-      let rows = parameters.items.iter().map(|item| {
+      let selected = parameters.table_state.selected().unwrap_or(0);
+      let rows = parameters.items.iter().enumerate().map(|(index, item)| {
         let required = match item.required {
           true => " * ",
           false => "   ",
@@ -271,6 +272,11 @@ impl Pane for ParameterEditor {
         let value = match &item.value {
           Some(value) => Span::from(value),
           None => Span::styled(String::from("No Value"), Style::default().dim()),
+        };
+
+        let value = match state.input_mode {
+          InputMode::Insert if selected == index => Span::default(),
+          _ => value,
         };
         Row::new(vec![
           Cell::from(Line::from(vec![Span::from(required).style(Color::Red), Span::from(item.name.clone())])),
@@ -285,19 +291,23 @@ impl Pane for ParameterEditor {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
       frame.render_stateful_widget(table, inner, &mut parameters.table_state);
+
       if let InputMode::Insert = state.input_mode {
-        if let Some(selected) = parameters.table_state.selected() {
-          let input_area = Rect {
-            x: inner.x + column_widths.first().unwrap_or(&Rect { x: 0, y: 0, width: 0, height: 0 }).width + 2,
-            y: inner.y + selected.saturating_sub(parameters.table_state.offset()) as u16,
-            width: 10,
-            height: 1,
-          };
-          frame.set_cursor(input_area.x, input_area.y);
-          let input =
-            Paragraph::new(Line::from(vec![Span::styled(self.input.value(), Style::default().fg(Color::LightBlue))]));
-          frame.render_widget(input, input_area);
-        }
+        let input_area = Rect {
+          x: inner.x + column_widths[0].width + 2,
+          y: inner.y + selected.saturating_sub(parameters.table_state.offset()) as u16,
+          width: column_widths[1].width - 2,
+          height: 1,
+        };
+
+        let scroll = self.input.visual_scroll(input_area.width as usize);
+        let input =
+          Paragraph::new(Line::from(vec![
+            Span::styled(self.input.value(), Style::default().fg(Color::LightBlue)).not_dim()
+          ]))
+          .scroll((0, scroll as u16));
+        frame.set_cursor(input_area.x + self.input.visual_cursor().saturating_sub(scroll) as u16, input_area.y);
+        frame.render_widget(input, input_area);
       }
     }
 
