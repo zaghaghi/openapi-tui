@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use crossterm::event::{Event, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use openapi_31::v31::parameter::In;
 use ratatui::{
   prelude::*,
@@ -164,8 +164,13 @@ impl Pane for ParameterEditor {
     match state.input_mode {
       InputMode::Normal => Ok(None),
       InputMode::Insert => {
-        self.input.handle_event(&Event::Key(key));
-        Ok(None)
+        match key.code {
+          KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
+          _ => {
+            self.input.handle_event(&Event::Key(key));
+            Ok(Some(EventResponse::Stop(Action::Noop)))
+          },
+        }
       },
     }
   }
@@ -275,7 +280,7 @@ impl Pane for ParameterEditor {
         };
 
         let value = match state.input_mode {
-          InputMode::Insert if selected == index => Span::default(),
+          InputMode::Insert if selected == index && self.focused => Span::default(),
           _ => value,
         };
         Row::new(vec![
@@ -292,7 +297,7 @@ impl Pane for ParameterEditor {
 
       frame.render_stateful_widget(table, inner, &mut parameters.table_state);
 
-      if let InputMode::Insert = state.input_mode {
+      if self.focused && InputMode::Insert == state.input_mode {
         let input_area = Rect {
           x: inner.x + column_widths[0].width + 2,
           y: inner.y + selected.saturating_sub(parameters.table_state.offset()) as u16,

@@ -12,7 +12,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::Page,
-  panes::{parameter_editor::ParameterEditor, Pane},
+  panes::{body_editor::BodyEditor, parameter_editor::ParameterEditor, Pane},
   state::{InputMode, OperationItem, State},
   tui::{Event, EventResponse},
 };
@@ -32,11 +32,12 @@ impl Phone {
     let focused_border_style = Style::default().fg(Color::LightGreen);
     let operation_item = Arc::new(operation_item);
     let parameter_editor = ParameterEditor::new(operation_item.clone(), true, focused_border_style);
+    let body_editor = BodyEditor::new(operation_item.clone(), false, focused_border_style);
     Ok(Self {
       operation_item,
       command_tx: None,
       config: Config::default(),
-      panes: vec![Box::new(parameter_editor)],
+      panes: vec![Box::new(parameter_editor), Box::new(body_editor)],
       focused_pane_index: 0,
     })
   }
@@ -102,31 +103,38 @@ impl Page for Phone {
         Ok(Some(response))
       },
       InputMode::Insert => {
-        let response = match key.code {
-          KeyCode::Enter => EventResponse::Stop(Action::Submit),
-          _ => {
-            for pane in self.panes.iter_mut() {
-              let response = pane.handle_events(Event::Key(key), state)?;
-              match response {
-                Some(EventResponse::Stop(_)) => return Ok(response),
-                Some(EventResponse::Continue(action)) => {
-                  if let Some(tx) = &self.command_tx {
-                    tx.send(action)?;
-                  }
-                },
-                _ => {},
-              }
-            }
-            return Ok(None);
-          },
-        };
-        Ok(Some(response))
+        // KeyCode::Enter => EventResponse::Stop(Action::Submit),
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          let response = pane.handle_events(Event::Key(key), state)?;
+          return Ok(response);
+        }
+        Ok(None)
       },
     }
   }
 
   fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
+      Action::FocusNext => {
+        let next_index = self.focused_pane_index.saturating_add(1) % self.panes.len();
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.unfocus()?;
+        }
+        self.focused_pane_index = next_index;
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.focus()?;
+        }
+      },
+      Action::FocusPrev => {
+        let prev_index = self.focused_pane_index.saturating_add(self.panes.len() - 1) % self.panes.len();
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.unfocus()?;
+        }
+        self.focused_pane_index = prev_index;
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.focus()?;
+        }
+      },
       Action::Update => {
         for pane in self.panes.iter_mut() {
           pane.update(action.clone(), state)?;
@@ -143,11 +151,8 @@ impl Page for Phone {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let outer_layout = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(3), Constraint::Fill(3)])
-      .split(area);
-
+    let outer_layout = Layout::vertical(vec![Constraint::Max(3), Constraint::Fill(3)]).split(area);
+    let input_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(outer_layout[1]);
     frame.render_widget(
       Paragraph::new(Line::from(vec![
         Span::styled(
@@ -163,7 +168,8 @@ impl Page for Phone {
       outer_layout[0],
     );
 
-    self.panes[0].draw(frame, outer_layout[1], state)?;
+    self.panes[0].draw(frame, input_layout[0], state)?;
+    self.panes[1].draw(frame, input_layout[1], state)?;
     Ok(())
   }
 }
