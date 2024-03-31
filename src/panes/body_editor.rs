@@ -10,6 +10,7 @@ use tui_textarea::TextArea;
 
 use crate::{
   action::Action,
+  pages::phone::{RequestBuilder, RequestPane},
   panes::Pane,
   state::{InputMode, OperationItem, State},
   tui::{EventResponse, Frame},
@@ -51,7 +52,20 @@ impl<'a> BodyEditor<'a> {
   }
 }
 
-impl<'a> Pane for BodyEditor<'a> {
+impl RequestPane for BodyEditor<'_> {
+}
+
+impl RequestBuilder for BodyEditor<'_> {
+  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if let Some(content_type) = self.content_types.get(self.content_type_index) {
+      request.header("content-type", content_type).body(self.input.lines().join("\n"))
+    } else {
+      request
+    }
+  }
+}
+
+impl Pane for BodyEditor<'_> {
   fn init(&mut self, state: &State) -> Result<()> {
     self.input.set_cursor_line_style(Style::default());
     self.input.set_line_number_style(Style::default().dim());

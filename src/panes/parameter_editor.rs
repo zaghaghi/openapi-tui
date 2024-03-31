@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
@@ -7,10 +7,12 @@ use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
   action::Action,
+  pages::phone::{RequestBuilder, RequestPane},
   panes::Pane,
   state::{InputMode, OperationItem, State},
   tui::{EventResponse, Frame},
@@ -138,6 +140,74 @@ impl ParameterEditor {
 
     Ok(())
   }
+
+  fn select_parameters<'a>(&'a self, parameter_type: &'a str) -> impl Iterator<Item = &ParameterItem> + 'a {
+    self
+      .parameters
+      .iter()
+      .filter_map(
+        |parameter| {
+          if parameter.location.eq_ignore_ascii_case(parameter_type) {
+            Some(&parameter.items)
+          } else {
+            None
+          }
+        },
+      )
+      .flatten()
+  }
+
+  fn path_parameters(&self) -> impl Iterator<Item = &ParameterItem> {
+    self.select_parameters("path")
+  }
+
+  fn query_parameters(&self) -> impl Iterator<Item = &ParameterItem> {
+    self.select_parameters("query")
+  }
+
+  fn header_parameters(&self) -> impl Iterator<Item = &ParameterItem> {
+    self.select_parameters("header")
+  }
+
+  #[allow(dead_code)]
+  fn cookie_parameters(&self) -> impl Iterator<Item = &ParameterItem> {
+    self.select_parameters("cookie")
+  }
+}
+
+impl RequestPane for ParameterEditor {
+}
+
+impl RequestBuilder for ParameterEditor {
+  fn path(&self, url: String) -> String {
+    self.path_parameters().fold(url, |url, path_param| {
+      if let Some(value) = &path_param.value {
+        url.replace(format!("{{{}}}", path_param.name).as_str(), value.as_str())
+      } else {
+        url
+      }
+    })
+  }
+
+  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    let query_params = self
+      .query_parameters()
+      .map(|query_param| (query_param.name.clone(), query_param.value.clone().unwrap_or_default()))
+      .collect::<Vec<_>>();
+
+    let header_params = self
+      .header_parameters()
+      .filter_map(|query_param| {
+        let name = query_param.name.as_str();
+        let value = query_param.value.as_deref().unwrap_or_default();
+        HeaderName::from_str(name)
+          .ok()
+          .and_then(|header_name| HeaderValue::from_str(value).ok().map(|header_value| (header_name, header_value)))
+      })
+      .collect::<HeaderMap<_>>();
+
+    request.query(&query_params).headers(header_params)
+  }
 }
 
 impl Pane for ParameterEditor {
@@ -220,7 +290,7 @@ impl Pane for ParameterEditor {
           if self.selected_parameter > 0 { self.selected_parameter - 1 } else { self.parameters.len() - 1 };
       },
 
-      Action::Submit if state.input_mode == InputMode::Normal => {
+      Action::Submit if state.input_mode == InputMode::Normal && !self.parameters.is_empty() => {
         state.input_mode = InputMode::Insert;
         if let Some(parameter) = self
           .parameters
@@ -230,7 +300,7 @@ impl Pane for ParameterEditor {
           self.input = self.input.clone().with_value(parameter.value.clone().unwrap_or_default());
         }
       },
-      Action::Submit if state.input_mode == InputMode::Insert => {
+      Action::Submit if state.input_mode == InputMode::Insert && !self.parameters.is_empty() => {
         state.input_mode = InputMode::Normal;
 
         if let Some(parameter) = self

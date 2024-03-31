@@ -7,9 +7,9 @@ use ratatui::{
   widgets::{block::*, *},
 };
 
-use super::response;
 use crate::{
   action::Action,
+  pages::phone::{RequestBuilder, RequestPane},
   panes::Pane,
   state::{InputMode, OperationItem, State},
   tui::{EventResponse, Frame},
@@ -39,6 +39,19 @@ impl ResponseViewer {
     match self.focused {
       true => BorderType::Thick,
       false => BorderType::Plain,
+    }
+  }
+}
+
+impl RequestPane for ResponseViewer {
+}
+
+impl RequestBuilder for ResponseViewer {
+  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    if let Some(content_type) = self.content_types.get(self.content_type_index) {
+      request.header("accept", content_type)
+    } else {
+      request
     }
   }
 }
@@ -73,28 +86,26 @@ impl Pane for ResponseViewer {
     Constraint::Fill(1)
   }
 
-  fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
+  fn handle_key_events(&mut self, _key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
       InputMode::Normal => Ok(None),
       InputMode::Insert => Ok(None),
     }
   }
 
-  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
-    if self.content_types.is_empty() {
-      return Ok(None);
-    }
+  fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {},
-      Action::Tab(index) if index < self.content_types.len().try_into()? => {
+      Action::Submit => return Ok(Some(Action::Dial)),
+      Action::Tab(index) if !self.content_types.is_empty() && index < self.content_types.len().try_into()? => {
         self.content_type_index = index.try_into()?;
       },
-      Action::TabNext => {
+      Action::TabNext if !self.content_types.is_empty() => {
         let next_tab_index = self.content_type_index + 1;
         self.content_type_index =
           if next_tab_index < self.content_types.len() { next_tab_index } else { self.content_type_index };
       },
-      Action::TabPrev => {
+      Action::TabPrev if !self.content_types.is_empty() => {
         self.content_type_index =
           if self.content_type_index > 0 { self.content_type_index - 1 } else { self.content_type_index };
       },
@@ -103,7 +114,7 @@ impl Pane for ResponseViewer {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
 

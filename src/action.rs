@@ -29,4 +29,5 @@ pub enum Action {
   Noop,
   NewCall,
   HangUp(Option<String>),
+  Dial,
 }

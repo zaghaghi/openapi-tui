@@ -23,8 +23,20 @@ pub struct Phone {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   focused_pane_index: usize,
-  panes: Vec<Box<dyn Pane>>,
+  panes: Vec<Box<dyn RequestPane>>,
 }
+
+pub trait RequestBuilder {
+  fn path(&self, url: String) -> String {
+    url
+  }
+
+  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    request
+  }
+}
+
+pub trait RequestPane: Pane + RequestBuilder {}
 
 impl Phone {
   pub fn new(operation_item: OperationItem) -> Result<Self> {
@@ -60,6 +72,20 @@ impl Phone {
     } else {
       String::from("http://localhost")
     }
+  }
+
+  fn build_request(&self, state: &State) -> Result<reqwest::Request> {
+    let url = self
+      .panes
+      .iter()
+      .fold(format!("{}{}", self.base_url(state), self.operation_item.path), |url, pane| pane.path(url));
+    let method = reqwest::Method::from_bytes(self.operation_item.method.as_bytes())?;
+    let request_builder = self
+      .panes
+      .iter()
+      .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.reqeust(request_builder));
+
+    Ok(request_builder.build()?)
   }
 }
 
@@ -138,6 +164,10 @@ impl Page for Phone {
         for pane in self.panes.iter_mut() {
           pane.update(action.clone(), state)?;
         }
+      },
+      Action::Dial => {
+        let req = self.build_request(state)?;
+        tracing::info!("{req:?}");
       },
 
       _ => {
