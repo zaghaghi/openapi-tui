@@ -12,7 +12,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::Page,
-  panes::{body_editor::BodyEditor, parameter_editor::ParameterEditor, Pane},
+  panes::{body_editor::BodyEditor, parameter_editor::ParameterEditor, response_viewer::ResponseViewer, Pane},
   state::{InputMode, OperationItem, State},
   tui::{Event, EventResponse},
 };
@@ -23,7 +23,6 @@ pub struct Phone {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   focused_pane_index: usize,
-
   panes: Vec<Box<dyn Pane>>,
 }
 
@@ -33,11 +32,12 @@ impl Phone {
     let operation_item = Arc::new(operation_item);
     let parameter_editor = ParameterEditor::new(operation_item.clone(), true, focused_border_style);
     let body_editor = BodyEditor::new(operation_item.clone(), false, focused_border_style);
+    let response_viewer = ResponseViewer::new(operation_item.clone(), false, focused_border_style);
     Ok(Self {
       operation_item,
       command_tx: None,
       config: Config::default(),
-      panes: vec![Box::new(parameter_editor), Box::new(body_editor)],
+      panes: vec![Box::new(parameter_editor), Box::new(body_editor), Box::new(response_viewer)],
       focused_pane_index: 0,
     })
   }
@@ -103,7 +103,6 @@ impl Page for Phone {
         Ok(Some(response))
       },
       InputMode::Insert => {
-        // KeyCode::Enter => EventResponse::Stop(Action::Submit),
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           let response = pane.handle_events(Event::Key(key), state)?;
           return Ok(response);
@@ -151,7 +150,7 @@ impl Page for Phone {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let outer_layout = Layout::vertical(vec![Constraint::Max(3), Constraint::Fill(3)]).split(area);
+    let outer_layout = Layout::vertical(vec![Constraint::Max(3), Constraint::Fill(1), Constraint::Fill(1)]).split(area);
     let input_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(outer_layout[1]);
     frame.render_widget(
       Paragraph::new(Line::from(vec![
@@ -170,6 +169,7 @@ impl Page for Phone {
 
     self.panes[0].draw(frame, input_layout[0], state)?;
     self.panes[1].draw(frame, input_layout[1], state)?;
+    self.panes[2].draw(frame, outer_layout[2], state)?;
     Ok(())
   }
 }

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::{
   prelude::*,
   widgets::{block::*, *},
 };
-use tui_textarea::TextArea;
 
+use super::response;
 use crate::{
   action::Action,
   panes::Pane,
@@ -15,25 +15,17 @@ use crate::{
   tui::{EventResponse, Frame},
 };
 
-pub struct BodyEditor<'a> {
+pub struct ResponseViewer {
   focused: bool,
   focused_border_style: Style,
   operation_item: Arc<OperationItem>,
-  input: TextArea<'a>,
   content_types: Vec<String>,
   content_type_index: usize,
 }
 
-impl<'a> BodyEditor<'a> {
+impl ResponseViewer {
   pub fn new(operation_item: Arc<OperationItem>, focused: bool, focused_border_style: Style) -> Self {
-    Self {
-      operation_item,
-      focused,
-      focused_border_style,
-      input: TextArea::default(),
-      content_types: vec![],
-      content_type_index: 0,
-    }
+    Self { operation_item, focused, focused_border_style, content_types: vec![], content_type_index: 0 }
   }
 
   fn border_style(&self) -> Style {
@@ -51,18 +43,19 @@ impl<'a> BodyEditor<'a> {
   }
 }
 
-impl<'a> Pane for BodyEditor<'a> {
+impl Pane for ResponseViewer {
   fn init(&mut self, state: &State) -> Result<()> {
-    self.input.set_cursor_line_style(Style::default());
-    self.input.set_line_number_style(Style::default().dim());
     self.content_types = self
       .operation_item
       .operation
-      .request_body
+      .responses
       .as_ref()
-      .and_then(|request_body| request_body.resolve(&state.openapi_spec).ok())
-      .map(|request| request.content.keys().cloned().collect::<Vec<_>>())
+      .and_then(|responses| responses.get("200"))
+      .and_then(|ok_response| ok_response.resolve(&state.openapi_spec).ok())
+      .and_then(|response| response.content)
+      .map(|content| content.keys().cloned().collect::<Vec<_>>())
       .unwrap_or_default();
+
     Ok(())
   }
 
@@ -83,15 +76,7 @@ impl<'a> Pane for BodyEditor<'a> {
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
       InputMode::Normal => Ok(None),
-      InputMode::Insert => {
-        match key.code {
-          KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
-          _ => {
-            self.input.input(key);
-            Ok(Some(EventResponse::Stop(Action::Noop)))
-          },
-        }
-      },
+      InputMode::Insert => Ok(None),
     }
   }
 
@@ -101,12 +86,6 @@ impl<'a> Pane for BodyEditor<'a> {
     }
     match action {
       Action::Update => {},
-      Action::Submit if state.input_mode == InputMode::Normal => {
-        state.input_mode = InputMode::Insert;
-      },
-      Action::Submit if state.input_mode == InputMode::Insert => {
-        state.input_mode = InputMode::Normal;
-      },
       Action::Tab(index) if index < self.content_types.len().try_into()? => {
         self.content_type_index = index.try_into()?;
       },
@@ -128,12 +107,6 @@ impl<'a> Pane for BodyEditor<'a> {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
 
-    if self.focused && state.input_mode == InputMode::Insert {
-      self.input.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    } else {
-      self.input.set_cursor_style(Style::default());
-    }
-
     if !self.content_types.is_empty() {
       let ctype = self.content_types[self.content_type_index].clone();
       let ctype_progress = if self.content_types.len() > 1 {
@@ -141,20 +114,12 @@ impl<'a> Pane for BodyEditor<'a> {
       } else {
         String::default()
       };
-      let line = Line::from(vec![Span::styled(format!(" Content Type: {ctype} {ctype_progress}",), Style::default())]);
+      let line = Line::from(vec![Span::styled(format!(" Accept: {ctype} {ctype_progress}",), Style::default())]);
       frame.render_widget(line, inner);
-
-      let mut inner = inner;
-      inner.y = inner.y.saturating_add(1);
-      inner.height = inner.height.saturating_sub(1);
-
-      frame.render_widget(self.input.widget(), inner);
-    } else {
-      frame.render_widget(Paragraph::new("Not Applicable"), inner);
     }
     frame.render_widget(
       Block::default()
-        .title("Body")
+        .title("Response")
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type()),

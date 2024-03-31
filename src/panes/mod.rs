@@ -16,6 +16,7 @@ pub mod header;
 pub mod parameter_editor;
 pub mod request;
 pub mod response;
+pub mod response_viewer;
 pub mod tags;
 
 pub trait Pane {
