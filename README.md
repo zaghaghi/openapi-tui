@@ -161,17 +161,21 @@ Then, add `openapi-tui` to your `configuration.nix`
 
 
 # Next Release
-- [ ] Schema Types (openapi-31)
-- [ ] Execute 
-  - [ ] Execute Popup Pane
-  - [ ] Request Schema Editor
-  - [ ] Header Input (No Validation)
-  - [ ] Path Input (No Validation)
-  - [ ] Plain Response Viewer (Status + Headers + Body)
+- [X] Phone Page
+- [X] Call History
+- [ ] Request Plain Editor
+- [X] Header Input (No Validation)
+- [X] Path Input (No Validation)
+- [ ] Calling
+- [ ] Plain Response Viewer (Status + Headers + Body)
 
 # Backlog
+- [ ] Schema Types (openapi-31)
 - [ ] Display Key Mappings in Popup
-- [ ] Execute 
 - [ ] Cache Schema Styles
 - [ ] Read Spec from STDIN 
 - [ ] Command Line
+- [ ] Refactor footer, add flash footer messages
+- [ ] History viewer
+- [ ] Support array query strings
+- [ ] Suppert extra headers
