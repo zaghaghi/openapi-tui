@@ -91,7 +91,13 @@ impl Pane for BodyEditor<'_> {
   }
 
   fn height_constraint(&self) -> Constraint {
-    Constraint::Fill(1)
+    if self.content_types.is_empty() {
+      return Constraint::Fill(1);
+    }
+    match self.focused {
+      true => Constraint::Fill(3),
+      false => Constraint::Fill(1),
+    }
   }
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {

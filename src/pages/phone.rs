@@ -26,6 +26,7 @@ pub struct Phone {
   config: Config,
   focused_pane_index: usize,
   panes: Vec<Box<dyn RequestPane>>,
+  fullscreen_pane_index: Option<usize>,
 }
 
 pub trait RequestBuilder {
@@ -54,6 +55,7 @@ impl Phone {
       config: Config::default(),
       panes: vec![Box::new(parameter_editor), Box::new(body_editor), Box::new(response_viewer)],
       focused_pane_index: 0,
+      fullscreen_pane_index: None,
     })
   }
 
@@ -119,6 +121,7 @@ impl Page for Phone {
           KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => EventResponse::Stop(Action::FocusPrev),
           KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => EventResponse::Stop(Action::Down),
           KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
+          KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
           KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1))
           },
@@ -163,6 +166,9 @@ impl Page for Phone {
           pane.focus()?;
         }
       },
+      Action::ToggleFullScreen => {
+        self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
+      },
       Action::Update => {
         for pane in self.panes.iter_mut() {
           pane.update(action.clone(), state)?;
@@ -187,8 +193,9 @@ impl Page for Phone {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let outer_layout = Layout::vertical(vec![Constraint::Max(3), Constraint::Fill(1), Constraint::Fill(1)]).split(area);
-    let input_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(outer_layout[1]);
+    let outer_layout =
+      Layout::vertical(vec![Constraint::Max(3), self.panes[1].height_constraint(), self.panes[2].height_constraint()])
+        .split(area);
     frame.render_widget(
       Paragraph::new(Line::from(vec![
         Span::styled(
@@ -204,9 +211,16 @@ impl Page for Phone {
       outer_layout[0],
     );
 
-    self.panes[0].draw(frame, input_layout[0], state)?;
-    self.panes[1].draw(frame, input_layout[1], state)?;
-    self.panes[2].draw(frame, outer_layout[2], state)?;
+    if let Some(fullscreen_pane_index) = self.fullscreen_pane_index {
+      let area = outer_layout[1].union(outer_layout[2]);
+      self.panes[fullscreen_pane_index].draw(frame, area, state)?;
+    } else {
+      let input_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(outer_layout[1]);
+
+      self.panes[0].draw(frame, input_layout[0], state)?;
+      self.panes[1].draw(frame, input_layout[1], state)?;
+      self.panes[2].draw(frame, outer_layout[2], state)?;
+    }
     Ok(())
   }
 }
