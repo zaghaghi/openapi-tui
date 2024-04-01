@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+
 use color_eyre::eyre::Result;
 use openapi_31::v31::{Openapi, Operation};
+
+use crate::response::Response;
 
 #[derive(Default)]
 pub struct State {
@@ -10,6 +14,7 @@ pub struct State {
   pub active_tag_name: Option<String>,
   pub active_filter: String,
   pub input_mode: InputMode,
+  pub responses: HashMap<String, Vec<Response>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -58,6 +63,7 @@ impl State {
       active_tag_name: None,
       active_filter: String::default(),
       input_mode: InputMode::Normal,
+      responses: HashMap::default(),
     })
   }
 
@@ -87,6 +93,7 @@ impl State {
       active_tag_name: None,
       active_filter: String::default(),
       input_mode: InputMode::Normal,
+      responses: HashMap::default(),
     })
   }
 

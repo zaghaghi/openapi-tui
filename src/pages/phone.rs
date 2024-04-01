@@ -13,6 +13,7 @@ use crate::{
   config::Config,
   pages::Page,
   panes::{body_editor::BodyEditor, parameter_editor::ParameterEditor, response_viewer::ResponseViewer, Pane},
+  request::Request,
   state::{InputMode, OperationItem, State},
   tui::{Event, EventResponse},
 };
@@ -21,6 +22,7 @@ use crate::{
 pub struct Phone {
   operation_item: Arc<OperationItem>,
   command_tx: Option<UnboundedSender<Action>>,
+  request_tx: Option<UnboundedSender<Request>>,
   config: Config,
   focused_pane_index: usize,
   panes: Vec<Box<dyn RequestPane>>,
@@ -39,7 +41,7 @@ pub trait RequestBuilder {
 pub trait RequestPane: Pane + RequestBuilder {}
 
 impl Phone {
-  pub fn new(operation_item: OperationItem) -> Result<Self> {
+  pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>) -> Result<Self> {
     let focused_border_style = Style::default().fg(Color::LightGreen);
     let operation_item = Arc::new(operation_item);
     let parameter_editor = ParameterEditor::new(operation_item.clone(), true, focused_border_style);
@@ -48,6 +50,7 @@ impl Phone {
     Ok(Self {
       operation_item,
       command_tx: None,
+      request_tx: Some(request_tx),
       config: Config::default(),
       panes: vec![Box::new(parameter_editor), Box::new(body_editor), Box::new(response_viewer)],
       focused_pane_index: 0,
@@ -166,8 +169,12 @@ impl Page for Phone {
         }
       },
       Action::Dial => {
-        let req = self.build_request(state)?;
-        tracing::info!("{req:?}");
+        if let Some(request_tx) = &self.request_tx {
+          request_tx.send(Request {
+            request: self.build_request(state)?,
+            operation_id: self.operation_item.operation.operation_id.clone().unwrap_or_default(),
+          })?;
+        }
       },
 
       _ => {

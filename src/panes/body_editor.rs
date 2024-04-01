@@ -149,26 +149,24 @@ impl Pane for BodyEditor<'_> {
     }
 
     if !self.content_types.is_empty() {
+      frame.render_widget(self.input.widget(), inner);
+    }
+
+    let content_types = if !self.content_types.is_empty() {
       let ctype = self.content_types[self.content_type_index].clone();
       let ctype_progress = if self.content_types.len() > 1 {
         format!("[{}/{}]", self.content_type_index + 1, self.content_types.len())
       } else {
         String::default()
       };
-      let line = Line::from(vec![Span::styled(format!(" Content Type: {ctype} {ctype_progress}",), Style::default())]);
-      frame.render_widget(line, inner);
-
-      let mut inner = inner;
-      inner.y = inner.y.saturating_add(1);
-      inner.height = inner.height.saturating_sub(1);
-
-      frame.render_widget(self.input.widget(), inner);
+      format!(": {ctype} {ctype_progress}")
     } else {
-      frame.render_widget(Paragraph::new("Not Applicable"), inner);
-    }
+      String::from(": Not Applicable")
+    };
+
     frame.render_widget(
       Block::default()
-        .title("Body")
+        .title(format!("Body{content_types}"))
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type()),

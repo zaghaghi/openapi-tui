@@ -360,7 +360,7 @@ impl Pane for ParameterEditor {
       });
       let row_widths = [Constraint::Fill(1), Constraint::Fill(2)];
       let column_widths = Layout::horizontal(row_widths).split(inner);
-      let table = Table::new(rows, row_widths)
+      let table = Table::new(rows, vec![column_widths[0].width, column_widths[1].width])
         .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
         .highlight_spacing(HighlightSpacing::Always)
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -369,9 +369,9 @@ impl Pane for ParameterEditor {
 
       if self.focused && InputMode::Insert == state.input_mode {
         let input_area = Rect {
-          x: inner.x + column_widths[0].width + 2,
+          x: inner.x + column_widths[0].width + 3,
           y: inner.y + selected.saturating_sub(parameters.table_state.offset()) as u16,
-          width: column_widths[1].width - 2,
+          width: column_widths[1].width - 3,
           height: 1,
         };
 

@@ -14,6 +14,8 @@ use crate::{
   config::Config,
   pages::{home::Home, phone::Phone, Page},
   panes::{footer::FooterPane, header::HeaderPane, Pane},
+  request::Request,
+  response::Response,
   state::{InputMode, OperationItemType, State},
   tui,
 };
@@ -61,7 +63,8 @@ impl App {
   }
 
   pub async fn run(&mut self) -> Result<()> {
-    let (action_tx, mut action_rx) = mpsc::unbounded_channel();
+    let (action_tx, mut action_rx) = mpsc::unbounded_channel::<Action>();
+    let (request_tx, mut request_rx) = mpsc::unbounded_channel::<Request>();
 
     let mut tui = tui::Tui::new()?;
     tui.enter()?;
@@ -184,7 +187,7 @@ impl App {
                   .and_then(|operation_id| self.history.remove(&operation_id))
                 {
                   self.pages.insert(0, page);
-                } else if let Ok(mut page) = Phone::new(operation_item.clone()) {
+                } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone()) {
                   page.init(&self.state)?;
                   self.pages.insert(0, Box::new(page));
                 }
@@ -213,6 +216,19 @@ impl App {
           action_tx.send(action)?
         };
       }
+
+      while let Ok(request) = request_rx.try_recv() {
+        if let Ok(response) = reqwest::Client::new().execute(request.request).await {
+          self.state.responses.insert(request.operation_id, vec![Response {
+            status: response.status(),
+            version: response.version(),
+            headers: response.headers().clone(),
+            content_length: response.content_length(),
+            body: response.text().await?.clone(),
+          }]);
+        }
+      }
+
       if self.should_suspend {
         tui.suspend()?;
         action_tx.send(Action::Resume)?;

@@ -114,23 +114,34 @@ impl Pane for ResponseViewer {
     Ok(None)
   }
 
-  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
+  fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
 
-    if !self.content_types.is_empty() {
+    if let Some(responses) =
+      self.operation_item.operation.operation_id.as_ref().and_then(|operation_id| state.responses.get(operation_id))
+    {
+      if let Some(response) = responses.first() {
+        frame.render_widget(Paragraph::new(response.body.clone()).wrap(Wrap { trim: false }), inner);
+      }
+    }
+
+    let content_types = if !self.content_types.is_empty() {
       let ctype = self.content_types[self.content_type_index].clone();
       let ctype_progress = if self.content_types.len() > 1 {
         format!("[{}/{}]", self.content_type_index + 1, self.content_types.len())
       } else {
         String::default()
       };
-      let line = Line::from(vec![Span::styled(format!(" Accept: {ctype} {ctype_progress}",), Style::default())]);
-      frame.render_widget(line, inner);
-    }
+
+      format!(": {ctype} {ctype_progress}")
+    } else {
+      String::default()
+    };
+
     frame.render_widget(
       Block::default()
-        .title("Response")
+        .title(format!("Response{content_types}"))
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type()),
