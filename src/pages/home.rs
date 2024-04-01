@@ -50,6 +50,15 @@ impl Page for Home {
     Ok(())
   }
 
+  fn focus(&mut self) -> Result<()> {
+    if let Some(command_tx) = &self.command_tx {
+      const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+      let status_line = format!("[l,h,j,k {ARROW} movement] [/ {ARROW} filter] [1-9 {ARROW} select tab] [g,b {ARROW} go/back definitions] [q {ARROW} quit]");
+      command_tx.send(Action::StatusLine(status_line))?;
+    }
+    Ok(())
+  }
+
   fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
     self.command_tx = Some(tx);
     Ok(())
@@ -91,12 +100,12 @@ impl Page for Home {
       Action::ToggleFullScreen => {
         self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
       },
-      Action::FocusFooter => {
+      Action::FocusFooter(_) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.unfocus()?;
         }
       },
-      Action::Filter(filter) => {
+      Action::FooterResult(filter) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.focus()?;
         }
@@ -131,7 +140,7 @@ impl Page for Home {
           },
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
-          KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter),
+          KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter(String::from("Filter:"))),
           _ => {
             return Ok(None);
           },

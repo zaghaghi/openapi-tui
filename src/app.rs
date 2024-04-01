@@ -79,6 +79,7 @@ impl App {
 
     for page in self.pages.iter_mut() {
       page.init(&self.state)?;
+      page.focus()?;
     }
 
     self.header.init(&self.state)?;
@@ -186,17 +187,24 @@ impl App {
                   .clone()
                   .and_then(|operation_id| self.history.remove(&operation_id))
                 {
+                  self.pages[0].unfocus()?;
                   self.pages.insert(0, page);
+                  self.pages[0].focus()?;
                 } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone()) {
+                  self.pages[0].unfocus()?;
                   page.init(&self.state)?;
+                  page.register_action_handler(action_tx.clone())?;
                   self.pages.insert(0, Box::new(page));
+                  self.pages[0].focus()?;
                 }
               }
             }
           },
           Action::HangUp(ref operation_id) => {
             if self.pages.len() > 1 {
+              self.pages[0].unfocus()?;
               let page = self.pages.remove(0);
+              self.pages[0].focus()?;
               if let Some(operation_id) = operation_id {
                 self.history.insert(operation_id.clone(), page);
               }
