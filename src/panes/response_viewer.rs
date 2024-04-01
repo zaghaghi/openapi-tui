@@ -118,10 +118,19 @@ impl Pane for ResponseViewer {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
 
+    let mut status_line = String::default();
+
     if let Some(responses) =
       self.operation_item.operation.operation_id.as_ref().and_then(|operation_id| state.responses.get(operation_id))
     {
       if let Some(response) = responses.first() {
+        status_line = format!(
+          "[{:?} {} {} {}]",
+          response.version,
+          response.status.as_str(),
+          symbols::DOT,
+          humansize::format_size(response.content_length.unwrap_or(response.body.len() as u64), humansize::DECIMAL)
+        );
         frame.render_widget(Paragraph::new(response.body.clone()).wrap(Wrap { trim: false }), inner);
       }
     }
@@ -144,7 +153,8 @@ impl Pane for ResponseViewer {
         .title(format!("Response{content_types}"))
         .borders(Borders::ALL)
         .border_style(self.border_style())
-        .border_type(self.border_type()),
+        .border_type(self.border_type())
+        .title_bottom(Line::from(status_line).right_aligned()),
       area,
     );
 
