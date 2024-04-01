@@ -102,6 +102,17 @@ impl Page for Phone {
     Ok(())
   }
 
+  fn focus(&mut self) -> Result<()> {
+    if let Some(command_tx) = &self.command_tx {
+      const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+      let status_line = format!(
+        "[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]"
+      );
+      command_tx.send(Action::StatusLine(status_line))?;
+    }
+    Ok(())
+  }
+
   fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
     self.command_tx = Some(tx);
     Ok(())

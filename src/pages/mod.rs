@@ -28,6 +28,14 @@ pub trait Page {
     Ok(())
   }
 
+  fn focus(&mut self) -> Result<()> {
+    Ok(())
+  }
+
+  fn unfocus(&mut self) -> Result<()> {
+    Ok(())
+  }
+
   fn handle_events(&mut self, event: Event, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     let r = match event {
       Event::Key(key_event) => self.handle_key_events(key_event, state)?,
