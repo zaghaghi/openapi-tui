@@ -1,4 +1,4 @@
-Output static/filter.gif
+Output static/call.gif
 Hide
     Set Shell zsh
 
@@ -13,21 +13,39 @@ Hide
     Set WindowBarSize 40
 
     Set Theme "Catppuccin Mocha"
-    Type "cargo run -- -i examples/stripe/spec.yml"
+    Type "cargo run -- -i examples/petstore.json"
     Enter
     Sleep 10s
     Set TypingSpeed 400ms
 Show
-Sleep 2s
-Type "/"
-Sleep 2s
-Type "balance"
+Type "j"
+Type "j"
+Type "j"
 Enter
 Sleep 2s
-Type "j"
-Type "j"
-
+Enter
+Type "tag1"
+Enter
+Type "l"
+Type "l"
+Enter
 Sleep 5s
+Escape
+
+Type "j"
+Enter
+Sleep 2s
+Enter
+Type "4"
+Enter
+Type "l"
+Type "l"
+Type "2"
+Enter
+Sleep 5s
+Escape
+
+Sleep 1s
 Hide
     Type "q"
     Ctrl+D

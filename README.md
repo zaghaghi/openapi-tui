@@ -51,6 +51,9 @@ Options:
 ## Filter
 ![filter](static/filter.gif)
 
+## Call Endpoints
+![call](static/call.gif)
+
 </details>
 
 <br />

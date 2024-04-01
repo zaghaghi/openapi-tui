@@ -13,7 +13,7 @@ Hide
     Set WindowBarSize 40
 
     Set Theme "Catppuccin Frappe"
-    Type "cargo run -q -- --openapi-path examples/petstore.json"
+    Type "cargo run -q -- -i examples/petstore.json"
     Enter
     Sleep 10s
     Set TypingSpeed 500ms
