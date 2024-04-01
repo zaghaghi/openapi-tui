@@ -158,16 +158,15 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Pane Fullscreen Mode
 - [X] Nested Components
 - [X] Status Line
-
-
-# Next Release
 - [X] Phone Page
 - [X] Call History
 - [X] Request Plain Editor
 - [X] Header Input (No Validation)
 - [X] Path Input (No Validation)
 - [X] Calling
-- [ ] Plain Response Viewer (Status + Headers + Body)
+- [X] Plain Response Viewer (Status + Headers + Body)
+
+# Next Release
 - [ ] History viewer
 - [ ] Refactor footer, add flash footer messages
 
