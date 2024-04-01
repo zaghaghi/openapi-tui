@@ -117,22 +117,41 @@ impl Pane for ResponseViewer {
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
     let inner = area.inner(&margin_h1_v1);
+    let inner_panes = Layout::horizontal([Constraint::Fill(3), Constraint::Fill(1)]).split(inner);
 
     let mut status_line = String::default();
 
-    if let Some(responses) =
+    if let Some(response) =
       self.operation_item.operation.operation_id.as_ref().and_then(|operation_id| state.responses.get(operation_id))
     {
-      if let Some(response) = responses.first() {
-        status_line = format!(
-          "[{:?} {} {} {}]",
-          response.version,
-          response.status.as_str(),
-          symbols::DOT,
-          humansize::format_size(response.content_length.unwrap_or(response.body.len() as u64), humansize::DECIMAL)
-        );
-        frame.render_widget(Paragraph::new(response.body.clone()).wrap(Wrap { trim: false }), inner);
-      }
+      status_line = format!(
+        "[{:?} {} {} {}]",
+        response.version,
+        response.status.as_str(),
+        symbols::DOT,
+        humansize::format_size(response.content_length.unwrap_or(response.body.len() as u64), humansize::DECIMAL)
+      );
+      frame.render_widget(
+        Paragraph::new(response.body.clone()).wrap(Wrap { trim: false }).block(
+          Block::default().borders(Borders::RIGHT).border_style(self.border_style()).border_type(self.border_type()),
+        ),
+        inner_panes[0],
+      );
+      frame.render_widget(
+        List::new(
+          response
+            .headers
+            .iter()
+            .map(|(hk, hv)| {
+              Line::from(vec![
+                Span::styled(format!("{}: ", hk), Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(hv.to_str().unwrap_or("ERROR")),
+              ])
+            })
+            .collect::<Vec<_>>(),
+        ),
+        inner_panes[1],
+      );
     }
 
     let content_types = if !self.content_types.is_empty() {
@@ -142,7 +161,6 @@ impl Pane for ResponseViewer {
       } else {
         String::default()
       };
-
       format!(": {ctype} {ctype_progress}")
     } else {
       String::default()

@@ -14,7 +14,7 @@ pub struct State {
   pub active_tag_name: Option<String>,
   pub active_filter: String,
   pub input_mode: InputMode,
-  pub responses: HashMap<String, Vec<Response>>,
+  pub responses: HashMap<String, Response>,
 }
 
 #[derive(Debug, Default, Clone)]

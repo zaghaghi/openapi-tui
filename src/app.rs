@@ -219,13 +219,13 @@ impl App {
 
       while let Ok(request) = request_rx.try_recv() {
         if let Ok(response) = reqwest::Client::new().execute(request.request).await {
-          self.state.responses.insert(request.operation_id, vec![Response {
+          self.state.responses.insert(request.operation_id, Response {
             status: response.status(),
             version: response.version(),
             headers: response.headers().clone(),
             content_length: response.content_length(),
             body: response.text().await?.clone(),
-          }]);
+          });
         }
       }
 
