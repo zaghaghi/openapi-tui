@@ -37,6 +37,7 @@ pub enum InputMode {
   #[default]
   Normal,
   Insert,
+  Command,
 }
 
 impl State {

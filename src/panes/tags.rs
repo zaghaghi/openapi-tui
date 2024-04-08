@@ -46,16 +46,6 @@ impl TagsPane {
 }
 
 impl Pane for TagsPane {
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     match self.focused {
       true => Constraint::Fill(3),
@@ -84,6 +74,14 @@ impl Pane for TagsPane {
         }
         self.update_active_tag(state);
         return Ok(Some(Action::Update));
+      },
+      Action::Focus => {
+        self.focused = true;
+        static STATUS_LINE: &str = "[j,k → move to filter]";
+        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+      },
+      Action::UnFocus => {
+        self.focused = false;
       },
       Action::Submit => {},
       _ => {},

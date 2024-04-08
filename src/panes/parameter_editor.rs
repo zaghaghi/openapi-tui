@@ -216,23 +216,12 @@ impl Pane for ParameterEditor {
     Ok(())
   }
 
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     Constraint::Fill(1)
   }
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Normal => Ok(None),
       InputMode::Insert => {
         match key.code {
           KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
@@ -242,6 +231,7 @@ impl Pane for ParameterEditor {
           },
         }
       },
+      _ => Ok(None),
     }
   }
 
@@ -289,7 +279,12 @@ impl Pane for ParameterEditor {
         self.selected_parameter =
           if self.selected_parameter > 0 { self.selected_parameter - 1 } else { self.parameters.len() - 1 };
       },
-
+      Action::Focus => {
+        self.focused = true;
+      },
+      Action::UnFocus => {
+        self.focused = false;
+      },
       Action::Submit if state.input_mode == InputMode::Normal && !self.parameters.is_empty() => {
         state.input_mode = InputMode::Insert;
         if let Some(parameter) = self

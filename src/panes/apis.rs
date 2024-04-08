@@ -46,17 +46,8 @@ impl ApisPane {
     }
   }
 }
+
 impl Pane for ApisPane {
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     match self.focused {
       true => Constraint::Fill(3),
@@ -82,6 +73,14 @@ impl Pane for ApisPane {
         }
         state.active_operation_index = self.current_operation_index;
         return Ok(Some(Action::Update));
+      },
+      Action::Focus => {
+        self.focused = true;
+        static STATUS_LINE: &str = "[j,k → movement] [ENTER → request]";
+        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+      },
+      Action::UnFocus => {
+        self.focused = false;
       },
       Action::Submit => {},
       Action::Update => {

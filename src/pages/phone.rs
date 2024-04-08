@@ -152,6 +152,7 @@ impl Page for Phone {
         }
         Ok(None)
       },
+      InputMode::Command => Ok(None),
     }
   }
 
@@ -160,21 +161,21 @@ impl Page for Phone {
       Action::FocusNext => {
         let next_index = self.focused_pane_index.saturating_add(1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.unfocus()?;
+          pane.update(Action::UnFocus, state)?;
         }
         self.focused_pane_index = next_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.focus()?;
+          pane.update(Action::Focus, state)?;
         }
       },
       Action::FocusPrev => {
         let prev_index = self.focused_pane_index.saturating_add(self.panes.len() - 1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.unfocus()?;
+          pane.update(Action::UnFocus, state)?;
         }
         self.focused_pane_index = prev_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.focus()?;
+          pane.update(Action::Focus, state)?;
         }
       },
       Action::ToggleFullScreen => {

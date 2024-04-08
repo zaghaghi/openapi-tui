@@ -80,16 +80,6 @@ impl Pane for BodyEditor<'_> {
     Ok(())
   }
 
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     if self.content_types.is_empty() {
       return Constraint::Fill(1);
@@ -102,7 +92,6 @@ impl Pane for BodyEditor<'_> {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Normal => Ok(None),
       InputMode::Insert => {
         match key.code {
           KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
@@ -112,6 +101,7 @@ impl Pane for BodyEditor<'_> {
           },
         }
       },
+      _ => Ok(None),
     }
   }
 
@@ -138,6 +128,12 @@ impl Pane for BodyEditor<'_> {
       Action::TabPrev => {
         self.content_type_index =
           if self.content_type_index > 0 { self.content_type_index - 1 } else { self.content_type_index };
+      },
+      Action::Focus => {
+        self.focused = true;
+      },
+      Action::UnFocus => {
+        self.focused = false;
       },
       _ => {},
     }

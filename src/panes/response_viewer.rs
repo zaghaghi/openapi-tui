@@ -72,16 +72,6 @@ impl Pane for ResponseViewer {
     Ok(())
   }
 
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     match self.focused {
       true => Constraint::Fill(3),
@@ -93,6 +83,7 @@ impl Pane for ResponseViewer {
     match state.input_mode {
       InputMode::Normal => Ok(None),
       InputMode::Insert => Ok(None),
+      InputMode::Command => Ok(None),
     }
   }
 
@@ -111,6 +102,12 @@ impl Pane for ResponseViewer {
       Action::TabPrev if !self.content_types.is_empty() => {
         self.content_type_index =
           if self.content_type_index > 0 { self.content_type_index - 1 } else { self.content_type_index };
+      },
+      Action::Focus => {
+        self.focused = true;
+      },
+      Action::UnFocus => {
+        self.focused = false;
       },
       _ => {},
     }

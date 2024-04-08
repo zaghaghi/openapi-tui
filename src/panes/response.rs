@@ -123,16 +123,6 @@ impl Pane for ResponsePane {
     Ok(())
   }
 
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     if self.schemas.get(self.schemas_index).is_none() {
       return Constraint::Min(2);
@@ -168,6 +158,14 @@ impl Pane for ResponsePane {
       Action::TabPrev => {
         self.schemas_index = if self.schemas_index > 0 { self.schemas_index - 1 } else { self.schemas.len() - 1 };
         self.init_schema(state)?;
+      },
+      Action::Focus => {
+        self.focused = true;
+        static STATUS_LINE: &str = "[1-9 → select tab] [g,b → go/back definitions]";
+        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+      },
+      Action::UnFocus => {
+        self.focused = false;
       },
       Action::Go => self.schema_viewer.go()?,
       Action::Back => {
