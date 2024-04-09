@@ -24,14 +24,6 @@ pub trait Pane {
     Ok(())
   }
 
-  fn focus(&mut self) -> Result<()> {
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint;
 
   fn handle_events(&mut self, event: Event, state: &mut State) -> Result<Option<EventResponse<Action>>> {

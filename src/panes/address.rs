@@ -47,22 +47,20 @@ impl AddressPane {
   }
 }
 impl Pane for AddressPane {
-  fn focus(&mut self) -> Result<()> {
-    self.focused = true;
-    Ok(())
-  }
-
-  fn unfocus(&mut self) -> Result<()> {
-    self.focused = false;
-    Ok(())
-  }
-
   fn height_constraint(&self) -> Constraint {
     Constraint::Max(3)
   }
 
   fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
     match action {
+      Action::Focus => {
+        self.focused = true;
+        static STATUS_LINE: &str = "[ENTER → request]";
+        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+      },
+      Action::UnFocus => {
+        self.focused = false;
+      },
       Action::Update => {},
       Action::Submit => {},
       _ => {},

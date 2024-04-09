@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
+type Command = String;
+type Args = Option<String>;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Display, Deserialize)]
 pub enum Action {
   Tick,
@@ -14,6 +17,8 @@ pub enum Action {
   Help,
   FocusNext,
   FocusPrev,
+  Focus,
+  UnFocus,
   Up,
   Down,
   Submit,
@@ -25,8 +30,9 @@ pub enum Action {
   Back,
   ToggleFullScreen,
   StatusLine(String),
-  FocusFooter(String),
-  FooterResult(String),
+  TimedStatusLine(String, u64),
+  FocusFooter(Command, Args),
+  FooterResult(Command, Args),
   Noop,
   NewCall,
   HangUp(Option<String>),

@@ -53,7 +53,8 @@ impl Page for Home {
   fn focus(&mut self) -> Result<()> {
     if let Some(command_tx) = &self.command_tx {
       const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-      let status_line = format!("[l,h,j,k {ARROW} movement] [/ {ARROW} filter] [1-9 {ARROW} select tab] [g,b {ARROW} go/back definitions] [q {ARROW} quit]");
+      let status_line =
+        format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]");
       command_tx.send(Action::StatusLine(status_line))?;
     }
     Ok(())
@@ -70,55 +71,79 @@ impl Page for Home {
   }
 
   fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
+    let mut actions: Vec<Option<Action>> = vec![];
     match action {
       Action::Tick => {},
       Action::FocusNext => {
         let next_index = self.focused_pane_index.saturating_add(1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.unfocus()?;
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = next_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.focus()?;
+          actions.push(pane.update(Action::Focus, state)?);
         }
       },
       Action::FocusPrev => {
         let prev_index = self.focused_pane_index.saturating_add(self.panes.len() - 1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.unfocus()?;
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = prev_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.focus()?;
+          actions.push(pane.update(Action::Focus, state)?);
         }
       },
       Action::Update => {
         for pane in self.panes.iter_mut() {
-          pane.update(action.clone(), state)?;
+          actions.push(pane.update(action.clone(), state)?);
         }
       },
       Action::ToggleFullScreen => {
         self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
       },
-      Action::FocusFooter(_) => {
+      Action::FocusFooter(..) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.unfocus()?;
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
       },
-      Action::FooterResult(filter) => {
+      Action::FooterResult(cmd, Some(args)) if cmd.eq("/") => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.focus()?;
+          actions.push(pane.update(Action::Focus, state)?);
         }
         state.active_operation_index = 0;
-        state.active_filter = filter;
+        state.active_filter = args;
 
-        return Ok(Some(Action::Update));
+        actions.push(Some(Action::Update));
+      },
+      Action::FooterResult(cmd, Some(args)) if cmd.eq(":") => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.update(Action::Focus, state)?;
+        }
+        if args.eq("q") {
+          actions.push(Some(Action::Quit));
+        } else if args.eq("request") {
+          actions.push(Some(Action::NewCall));
+        } else {
+          actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
+        }
+      },
+      Action::FooterResult(_cmd, None) => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          actions.push(pane.update(Action::Focus, state)?);
+        }
       },
       _ => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          return pane.update(action, state);
+          actions.push(pane.update(action, state)?);
         }
       },
+    }
+
+    if let Some(tx) = &mut self.command_tx {
+      actions.into_iter().flatten().for_each(|action| {
+        tx.send(action).ok();
+      });
     }
     Ok(None)
   }
@@ -140,7 +165,8 @@ impl Page for Home {
           },
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
-          KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter(String::from("Filter:"))),
+          KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter("/".into(), Some(state.active_filter.clone()))),
+          KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
           _ => {
             return Ok(None);
           },
@@ -148,6 +174,7 @@ impl Page for Home {
         Ok(Some(response))
       },
       InputMode::Insert => Ok(None),
+      InputMode::Command => Ok(None),
     }
   }
 
