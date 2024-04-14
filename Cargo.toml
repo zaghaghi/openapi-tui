@@ -1,6 +1,6 @@
 [package]
 name = "openapi-tui"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 description = "This TUI allows you to list and browse APIs described by the openapi specification."
 
