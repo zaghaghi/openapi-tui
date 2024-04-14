@@ -147,8 +147,17 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `[` | Move to previous tab |
 | `f` | Toggle fullscreen pane|
 | `g` | Go in nested items in lists|
+| `q` | Quit|
 | `/` | Filter apis|
+| `:` | Run commands|
 | `Backspace`, `b` | Get out of nested items in lists|
+
+# Commands
+| Command | Description |
+|:--------|:------------|
+| `q` | Quit |
+| `request` | Go to request page|
+| `history` | Request history|
 
 # Implemented Features
 - [X] Viewer
@@ -170,14 +179,15 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Plain Response Viewer (Status + Headers + Body)
 
 # Next Release
-- [ ] History viewer
-- [ ] Refactor footer, add flash footer messages
+- [X] History viewer
+- [X] Refactor footer, add flash footer messages
+- [ ] Import request body file
+- [ ] Save response body and header
 
 # Backlog
 - [ ] Schema Types (openapi-31)
 - [ ] Display Key Mappings in Popup
 - [ ] Cache Schema Styles
 - [ ] Read Spec from STDIN 
-- [ ] Command Line
 - [ ] Support array query strings
 - [ ] Suppert extra headers

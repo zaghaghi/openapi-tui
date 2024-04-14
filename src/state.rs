@@ -106,6 +106,10 @@ impl State {
     }
   }
 
+  pub fn get_operation(&self, operation_id: Option<String>) -> Option<&OperationItem> {
+    self.openapi_operations.iter().find(|operation_item| operation_item.operation.operation_id.eq(&operation_id))
+  }
+
   pub fn active_operation(&self) -> Option<&OperationItem> {
     if let Some(active_tag) = &self.active_tag_name {
       self
