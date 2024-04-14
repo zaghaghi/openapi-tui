@@ -177,10 +177,10 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Path Input (No Validation)
 - [X] Calling
 - [X] Plain Response Viewer (Status + Headers + Body)
-
-# Next Release
 - [X] History viewer
 - [X] Refactor footer, add flash footer messages
+
+# Next Release
 - [ ] Import request body file
 - [ ] Save response body and header
 
