@@ -34,7 +34,9 @@ pub enum Action {
   FocusFooter(Command, Args),
   FooterResult(Command, Args),
   Noop,
-  NewCall,
+  NewCall(Option<String>),
   HangUp(Option<String>),
   Dial,
+  History,
+  CloseHistory,
 }

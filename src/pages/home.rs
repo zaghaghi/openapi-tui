@@ -122,8 +122,11 @@ impl Page for Home {
         }
         if args.eq("q") {
           actions.push(Some(Action::Quit));
-        } else if args.eq("request") {
-          actions.push(Some(Action::NewCall));
+        } else if args.eq("request") || args.eq("r") {
+          actions
+            .push(Some(Action::NewCall(state.active_operation().and_then(|op| op.operation.operation_id.clone()))));
+        } else if args.eq("history") {
+          actions.push(Some(Action::History));
         } else {
           actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
         }
@@ -158,7 +161,11 @@ impl Page for Home {
           KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
           KeyCode::Char('g') | KeyCode::Char('G') => EventResponse::Stop(Action::Go),
           KeyCode::Backspace | KeyCode::Char('b') | KeyCode::Char('B') => EventResponse::Stop(Action::Back),
-          KeyCode::Enter => EventResponse::Stop(Action::NewCall),
+          KeyCode::Enter => {
+            EventResponse::Stop(Action::NewCall(
+              state.active_operation().and_then(|op| op.operation.operation_id.clone()),
+            ))
+          },
           KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
           KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1))

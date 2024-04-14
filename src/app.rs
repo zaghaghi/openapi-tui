@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-  layout::{Constraint, Direction, Layout},
+  layout::{Constraint, Layout},
   prelude::Rect,
 };
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::{home::Home, phone::Phone, Page},
-  panes::{footer::FooterPane, header::HeaderPane, Pane},
+  panes::{footer::FooterPane, header::HeaderPane, history::HistoryPane, Pane},
   request::Request,
   response::Response,
   state::{InputMode, OperationItemType, State},
@@ -33,6 +33,7 @@ pub struct App {
   pub active_page: usize,
   pub footer: FooterPane,
   pub header: HeaderPane,
+  pub popup: Option<Box<dyn Pane>>,
   pub should_quit: bool,
   pub should_suspend: bool,
   pub mode: Mode,
@@ -53,6 +54,7 @@ impl App {
       active_page: 0,
       footer: FooterPane::new(),
       header: HeaderPane::new(),
+      popup: None,
       should_quit: false,
       should_suspend: false,
       config,
@@ -88,9 +90,9 @@ impl App {
     loop {
       if let Some(e) = tui.next().await {
         let mut stop_event_propagation = self
-          .pages
-          .get_mut(self.active_page)
-          .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
+          .popup
+          .as_mut()
+          .and_then(|pane| pane.handle_events(e.clone(), &mut self.state).ok())
           .map(|response| {
             match response {
               Some(tui::EventResponse::Continue(action)) => {
@@ -105,6 +107,25 @@ impl App {
             }
           })
           .unwrap_or(false);
+        stop_event_propagation = stop_event_propagation
+          || self
+            .pages
+            .get_mut(self.active_page)
+            .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
+            .map(|response| {
+              match response {
+                Some(tui::EventResponse::Continue(action)) => {
+                  action_tx.send(action).ok();
+                  false
+                },
+                Some(tui::EventResponse::Stop(action)) => {
+                  action_tx.send(action).ok();
+                  true
+                },
+                _ => false,
+              }
+            })
+            .unwrap_or(false);
 
         stop_event_propagation = stop_event_propagation
           || self
@@ -178,8 +199,8 @@ impl App {
               })
             })?;
           },
-          Action::NewCall => {
-            if let Some(operation_item) = self.state.active_operation() {
+          Action::NewCall(ref operation_id) => {
+            if let Some(operation_item) = self.state.get_operation(operation_id.clone()) {
               if let OperationItemType::Path = operation_item.r#type {
                 if let Some(page) = operation_item
                   .operation
@@ -199,6 +220,7 @@ impl App {
                 }
               }
             }
+            action_tx.send(Action::CloseHistory).unwrap();
           },
           Action::HangUp(ref operation_id) => {
             if self.pages.len() > 1 {
@@ -210,13 +232,37 @@ impl App {
               }
             }
           },
+          Action::History => {
+            let operation_ids = self
+              .state
+              .openapi_operations
+              .iter()
+              .filter(|operation_item| {
+                let op_id = operation_item.operation.operation_id.clone();
+                self.history.keys().any(|operation_id| op_id.eq(&Some(operation_id.clone())))
+              })
+              .collect::<Vec<_>>();
+            let history_popup = HistoryPane::new(operation_ids);
+            self.popup = Some(Box::new(history_popup));
+          },
+          Action::CloseHistory => {
+            if self.popup.is_some() {
+              self.popup = None;
+            }
+          },
           _ => {},
         }
-        if let Some(page) = self.pages.get_mut(self.active_page) {
+
+        if let Some(popup) = &mut self.popup {
+          if let Some(action) = popup.update(action.clone(), &mut self.state)? {
+            action_tx.send(action)?
+          };
+        } else if let Some(page) = self.pages.get_mut(self.active_page) {
           if let Some(action) = page.update(action.clone(), &mut self.state)? {
             action_tx.send(action)?
           };
         }
+
         if let Some(action) = self.header.update(action.clone(), &mut self.state)? {
           action_tx.send(action)?
         };
@@ -252,10 +298,8 @@ impl App {
   }
 
   fn draw(&mut self, frame: &mut tui::Frame<'_>) -> Result<()> {
-    let vertical_layout = Layout::default()
-      .direction(Direction::Vertical)
-      .constraints(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)])
-      .split(frame.size());
+    let vertical_layout =
+      Layout::vertical(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)]).split(frame.size());
 
     self.header.draw(frame, vertical_layout[0], &self.state)?;
 
@@ -263,6 +307,13 @@ impl App {
       page.draw(frame, vertical_layout[1], &self.state)?;
     };
 
+    if let Some(popup) = &mut self.popup {
+      let popup_vertical_layout =
+        Layout::vertical(vec![Constraint::Fill(1), popup.height_constraint(), Constraint::Fill(1)]).split(frame.size());
+      let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1), Constraint::Fill(1)])
+        .split(popup_vertical_layout[1]);
+      popup.draw(frame, popup_layout[1], &self.state)?;
+    }
     self.footer.draw(frame, vertical_layout[2], &self.state)?;
     Ok(())
   }

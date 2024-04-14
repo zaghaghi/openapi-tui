@@ -13,6 +13,7 @@ pub mod apis;
 pub mod body_editor;
 pub mod footer;
 pub mod header;
+pub mod history;
 pub mod parameter_editor;
 pub mod request;
 pub mod response;
