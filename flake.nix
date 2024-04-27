@@ -43,6 +43,7 @@
   in {
     packages = eachSystem (system: {
       openapi-tui = pkgsFor.${system}.myPackage;
+      default =     pkgsFor.${system}.myPackage;
     });
 
     checks = eachSystem (system: self.packages.${system});
