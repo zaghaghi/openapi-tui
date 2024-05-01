@@ -152,12 +152,20 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `:` | Run commands|
 | `Backspace`, `b` | Get out of nested items in lists|
 
-# Commands
+# Commands Main Page
 | Command | Description |
 |:--------|:------------|
 | `q` | Quit |
-| `request` | Go to request page|
+| `request`, `r` | Go to request page|
 | `history` | Request history|
+
+# Commands Request Page
+| Command | Description |
+|:--------|:------------|
+| `q` | Quit |
+| `send`, `s` | send request|
+
+
 
 # Implemented Features
 - [X] Viewer
@@ -183,6 +191,7 @@ Then, add `openapi-tui` to your `configuration.nix`
 # Next Release
 - [ ] Import request body file
 - [ ] Save response body and header
+- [X] Command history with ↑/↓
 
 # Backlog
 - [ ] Schema Types (openapi-31)
@@ -191,3 +200,4 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [ ] Read Spec from STDIN 
 - [ ] Support array query strings
 - [ ] Suppert extra headers
+- [ ] Request progress bar
