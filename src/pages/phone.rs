@@ -139,6 +139,7 @@ impl Page for Phone {
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
           KeyCode::Enter => EventResponse::Stop(Action::Submit),
+          KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
           _ => {
             return Ok(None);
           },
@@ -157,25 +158,27 @@ impl Page for Phone {
   }
 
   fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
+    let mut actions: Vec<Option<Action>> = vec![];
+
     match action {
       Action::FocusNext => {
         let next_index = self.focused_pane_index.saturating_add(1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.update(Action::UnFocus, state)?;
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = next_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.update(Action::Focus, state)?;
+          actions.push(pane.update(Action::Focus, state)?);
         }
       },
       Action::FocusPrev => {
         let prev_index = self.focused_pane_index.saturating_add(self.panes.len() - 1) % self.panes.len();
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.update(Action::UnFocus, state)?;
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = prev_index;
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          pane.update(Action::Focus, state)?;
+          actions.push(pane.update(Action::Focus, state)?);
         }
       },
       Action::ToggleFullScreen => {
@@ -183,7 +186,7 @@ impl Page for Phone {
       },
       Action::Update => {
         for pane in self.panes.iter_mut() {
-          pane.update(action.clone(), state)?;
+          actions.push(pane.update(action.clone(), state)?);
         }
       },
       Action::Dial => {
@@ -194,12 +197,38 @@ impl Page for Phone {
           })?;
         }
       },
-
-      _ => {
+      Action::FocusFooter(..) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
-          return pane.update(action, state);
+          actions.push(pane.update(Action::UnFocus, state)?);
         }
       },
+      Action::FooterResult(cmd, Some(args)) if cmd.eq(":") => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          pane.update(Action::Focus, state)?;
+        }
+        if args.eq("q") {
+          actions.push(Some(Action::Quit));
+        } else if args.eq("send") || args.eq("s") {
+          actions.push(Some(Action::Dial));
+        } else {
+          actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
+        }
+      },
+      Action::FooterResult(_cmd, None) => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          actions.push(pane.update(Action::Focus, state)?);
+        }
+      },
+      _ => {
+        if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
+          actions.push(pane.update(action, state)?);
+        }
+      },
+    }
+    if let Some(tx) = &mut self.command_tx {
+      actions.into_iter().flatten().for_each(|action| {
+        tx.send(action).ok();
+      });
     }
     Ok(None)
   }
