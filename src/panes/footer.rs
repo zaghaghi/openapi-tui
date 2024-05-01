@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::VecDeque, time::Instant};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
@@ -18,6 +18,12 @@ struct TimedStatusLine {
   status_line: String,
 }
 
+struct Config {
+  max_command_history: usize,
+}
+
+static CONFIG: Config = Config { max_command_history: 20 };
+
 #[derive(Default)]
 pub struct FooterPane {
   focused: bool,
@@ -25,17 +31,13 @@ pub struct FooterPane {
   command: String,
   status_line: String,
   timed_status_line: Option<TimedStatusLine>,
+  command_history: VecDeque<String>,
+  command_history_index: Option<usize>,
 }
 
 impl FooterPane {
   pub fn new() -> Self {
-    Self {
-      focused: false,
-      input: Input::default(),
-      command: String::default(),
-      status_line: String::default(),
-      timed_status_line: None,
-    }
+    Self { focused: false, ..Default::default() }
   }
 
   fn get_status_line(&mut self) -> &String {
@@ -58,9 +60,31 @@ impl Pane for FooterPane {
         self.input.handle_event(&Event::Key(key));
         let response = match key.code {
           KeyCode::Enter => {
+            self.command_history.push_front(self.input.to_string());
+            self.command_history.truncate(CONFIG.max_command_history);
+            self.command_history_index = None;
             Some(EventResponse::Stop(Action::FooterResult(self.command.clone(), Some(self.input.to_string()))))
           },
-          KeyCode::Esc => Some(EventResponse::Stop(Action::FooterResult(self.command.clone(), None))),
+          KeyCode::Esc => {
+            self.command_history_index = None;
+            Some(EventResponse::Stop(Action::FooterResult(self.command.clone(), None)))
+          },
+          KeyCode::Up if !self.command_history.is_empty() => {
+            let history_index =
+              self.command_history_index.map(|idx| idx.saturating_add(1) % self.command_history.len()).unwrap_or(0);
+            self.input = self.input.clone().with_value(self.command_history[history_index].clone());
+            self.command_history_index = Some(history_index);
+            None
+          },
+          KeyCode::Down if !self.command_history.is_empty() => {
+            let history_index = self
+              .command_history_index
+              .map(|idx| idx.saturating_add(self.command_history.len() - 1) % self.command_history.len())
+              .unwrap_or(self.command_history.len() - 1);
+            self.input = self.input.clone().with_value(self.command_history[history_index].clone());
+            self.command_history_index = Some(history_index);
+            None
+          },
           _ => None,
         };
         Ok(response)
