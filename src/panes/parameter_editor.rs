@@ -115,20 +115,16 @@ impl ParameterEditor {
           table_state: TableState::default().with_selected(0),
         });
       }
-      if !query_items.is_empty() {
-        self.parameters.push(ParameterTab {
-          location: "Query".to_string(),
-          items: query_items,
-          table_state: TableState::default().with_selected(0),
-        });
-      }
-      if !header_items.is_empty() {
-        self.parameters.push(ParameterTab {
-          location: "Header".to_string(),
-          items: header_items,
-          table_state: TableState::default().with_selected(0),
-        });
-      }
+      self.parameters.push(ParameterTab {
+        location: "Query".to_string(),
+        items: query_items,
+        table_state: TableState::default().with_selected(0),
+      });
+      self.parameters.push(ParameterTab {
+        location: "Header".to_string(),
+        items: header_items,
+        table_state: TableState::default().with_selected(0),
+      });
       if !cookie_items.is_empty() {
         self.parameters.push(ParameterTab {
           location: "Cookie".to_string(),
@@ -242,7 +238,7 @@ impl Pane for ParameterEditor {
         if let Some(parameters) = self.parameters.get_mut(self.selected_parameter).as_mut() {
           let i = match parameters.table_state.selected() {
             Some(i) => {
-              if i >= parameters.items.len() - 1 {
+              if i >= parameters.items.len().saturating_sub(1) {
                 0
               } else {
                 i + 1
@@ -258,7 +254,7 @@ impl Pane for ParameterEditor {
           let i = match parameters.table_state.selected() {
             Some(i) => {
               if i == 0 {
-                parameters.items.len() - 1
+                parameters.items.len().saturating_sub(1)
               } else {
                 i - 1
               }
@@ -311,6 +307,42 @@ impl Pane for ParameterEditor {
         }
         self.input.reset();
       },
+      Action::AddHeader(header_name) => {
+        if let Some(param_tab) = self.parameters.iter_mut().find(|item| item.location.to_lowercase().eq("header")) {
+          param_tab.items.push(ParameterItem { name: header_name, ..Default::default() });
+        }
+      },
+      Action::RemoveHeader(header_name) => {
+        if let Some(param_tab) = self.parameters.iter_mut().find(|item| item.location.to_lowercase().eq("header")) {
+          if let Some(last_header_index) = param_tab
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| if item.name.eq(&header_name) { Some(index) } else { None })
+            .last()
+          {
+            param_tab.items.remove(last_header_index);
+          }
+        }
+      },
+      Action::AddQuery(query_name) => {
+        if let Some(param_tab) = self.parameters.iter_mut().find(|item| item.location.to_lowercase().eq("query")) {
+          param_tab.items.push(ParameterItem { name: query_name, ..Default::default() });
+        }
+      },
+      Action::RemoveQuery(query_name) => {
+        if let Some(param_tab) = self.parameters.iter_mut().find(|item| item.location.to_lowercase().eq("query")) {
+          if let Some(last_query_index) = param_tab
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| if item.name.eq(&query_name) { Some(index) } else { None })
+            .last()
+          {
+            param_tab.items.remove(last_query_index);
+          }
+        }
+      },
       _ => {},
     }
     Ok(None)
@@ -355,12 +387,22 @@ impl Pane for ParameterEditor {
       });
       let row_widths = [Constraint::Fill(1), Constraint::Fill(2)];
       let column_widths = Layout::horizontal(row_widths).split(inner);
-      let table = Table::new(rows, vec![column_widths[0].width, column_widths[1].width])
-        .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
-        .highlight_spacing(HighlightSpacing::Always)
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+      if !parameters.items.is_empty() {
+        let table = Table::new(rows, vec![column_widths[0].width, column_widths[1].width])
+          .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
+          .highlight_spacing(HighlightSpacing::Always)
+          .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
-      frame.render_stateful_widget(table, inner, &mut parameters.table_state);
+        frame.render_stateful_widget(table, inner, &mut parameters.table_state);
+      } else {
+        let location = parameters.location.to_lowercase();
+        let empty_msg = if location.eq("query") || location.eq("header") {
+          format!(" No {location} item available. try [{location} add {location}-name] command to add one.")
+        } else {
+          format!(" No {location} item available.")
+        };
+        frame.render_widget(Paragraph::new(empty_msg).style(Style::default().dim()), inner);
+      }
 
       if self.focused && InputMode::Insert == state.input_mode {
         let input_area = Rect {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Read, sync::Arc};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -135,6 +135,19 @@ impl Pane for BodyEditor<'_> {
       Action::UnFocus => {
         self.focused = false;
       },
+      Action::OpenRequestPayload(filepath) => {
+        if let Err(error) = std::fs::File::open(filepath)
+          .and_then(|mut file| {
+            let mut buffer = String::new();
+            file.read_to_string(&mut buffer).map(|_| buffer)
+          })
+          .map(|item| {
+            self.input = TextArea::from(item.lines());
+          })
+        {
+          return Ok(Some(Action::TimedStatusLine(format!("can't open or read file content: {error}"), 5)));
+        }
+      },
       _ => {},
     }
     Ok(None)
@@ -151,7 +164,17 @@ impl Pane for BodyEditor<'_> {
     }
 
     if !self.content_types.is_empty() {
-      frame.render_widget(self.input.widget(), inner);
+      if !self.input.is_empty() || state.input_mode == InputMode::Insert {
+        frame.render_widget(self.input.widget(), inner);
+      } else {
+        frame.render_widget(
+          Paragraph::new(
+            " Press enter to start editing,\n or try [request open payload-file-path] command to load from a file.",
+          )
+          .style(Style::default().dim()),
+          inner,
+        );
+      }
     }
 
     let content_types = if !self.content_types.is_empty() {

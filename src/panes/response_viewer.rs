@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
@@ -87,7 +87,7 @@ impl Pane for ResponseViewer {
     }
   }
 
-  fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
+  fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {},
       Action::Submit => return Ok(Some(Action::Dial)),
@@ -108,6 +108,19 @@ impl Pane for ResponseViewer {
       },
       Action::UnFocus => {
         self.focused = false;
+      },
+      Action::SaveResponsePayload(filepath) => {
+        if let Some(response) =
+          self.operation_item.operation.operation_id.as_ref().and_then(|operation_id| state.responses.get(operation_id))
+        {
+          if let Err(error) =
+            std::fs::File::create(filepath).and_then(|mut file| file.write_all(response.body.as_bytes()))
+          {
+            return Ok(Some(Action::TimedStatusLine(format!("can't create or write file content: {error}"), 5)));
+          }
+        } else {
+          return Ok(Some(Action::TimedStatusLine("response is not available".into(), 5)));
+        }
       },
       _ => {},
     }
@@ -152,6 +165,11 @@ impl Pane for ResponseViewer {
         ),
         inner_panes[1],
       );
+    } else {
+      frame.render_widget(
+        Paragraph::new(" No response is available. Press enter or try [send] command.").style(Style::default().dim()),
+        inner,
+      )
     }
 
     let content_types = if !self.content_types.is_empty() {

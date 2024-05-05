@@ -163,8 +163,11 @@ Then, add `openapi-tui` to your `configuration.nix`
 | Command | Description |
 |:--------|:------------|
 | `q` | Quit |
-| `send`, `s` | send request|
-
+| `send`, `s` | Send request |
+| `query`, `q` | Add or remove query strings. sub-commands are `add` or `rm`. e.g. `query add page` |
+| `header`, `h` | Add or remove headers. sub-commands are `add` or `rm`. e.g. `header add x-api-key` |
+| `request`, `r` | Load request payload. e.g. `request open /home/hamed/payload.json` |
+| `response`, `s` | Save response payload e.g/ `response save /home/hamed/result.json` |
 
 
 # Implemented Features
@@ -189,15 +192,14 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Refactor footer, add flash footer messages
 
 # Next Release
-- [ ] Import request body file
-- [ ] Save response body and header
+- [X] Import request body file
+- [X] Save response body and header
 - [X] Command history with ↑/↓
+- [X] Support array query strings
+- [X] Suppert extra headers
 
 # Backlog
 - [ ] Schema Types (openapi-31)
 - [ ] Display Key Mappings in Popup
-- [ ] Cache Schema Styles
 - [ ] Read Spec from STDIN 
-- [ ] Support array query strings
-- [ ] Suppert extra headers
 - [ ] Request progress bar
