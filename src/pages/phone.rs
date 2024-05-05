@@ -257,7 +257,11 @@ impl Page for Phone {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.update(Action::Focus, state)?;
         }
-        actions.push(self.handle_commands(args));
+        if let Some(action) = self.handle_commands(args) {
+          for pane in self.panes.iter_mut() {
+            actions.push(pane.update(action.clone(), state)?);
+          }
+        }
       },
       Action::FooterResult(_cmd, None) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
