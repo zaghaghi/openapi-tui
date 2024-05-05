@@ -39,4 +39,10 @@ pub enum Action {
   Dial,
   History,
   CloseHistory,
+  AddQuery(String),
+  RemoveQuery(String),
+  AddHeader(String),
+  RemoveHeader(String),
+  OpenRequestPayload(String),
+  SaveResponsePayload(String),
 }

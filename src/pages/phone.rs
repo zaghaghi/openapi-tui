@@ -92,6 +92,57 @@ impl Phone {
 
     Ok(request_builder.build()?)
   }
+
+  fn handle_commands(&self, command_args: String) -> Option<Action> {
+    if command_args.eq("q") {
+      return Some(Action::Quit);
+    }
+    if command_args.eq("send") || command_args.eq("s") {
+      return Some(Action::Dial);
+    }
+    if command_args.starts_with("query ") || command_args.starts_with("q ") {
+      let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
+      if command_parts.len() == 3 {
+        if command_parts[1].eq("add") {
+          return Some(Action::AddQuery(command_parts[2].into()));
+        }
+        if command_parts[1].eq("rm") {
+          return Some(Action::RemoveQuery(command_parts[2].into()));
+        }
+      }
+      return Some(Action::TimedStatusLine("invalid query args. query add/rm <query-name>".into(), 3));
+    }
+    if command_args.starts_with("header ") || command_args.starts_with("h ") {
+      let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
+      if command_parts.len() == 3 {
+        if command_parts[1].eq("add") {
+          return Some(Action::AddHeader(command_parts[2].into()));
+        }
+        if command_parts[1].eq("rm") {
+          return Some(Action::RemoveHeader(command_parts[2].into()));
+        }
+      }
+      return Some(Action::TimedStatusLine("invalid header args. header add/rm <query-name>".into(), 3));
+    }
+    if command_args.starts_with("request ") || command_args.starts_with("r ") {
+      let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
+      if command_parts.len() == 3 && command_parts[1].eq("open") {
+        return Some(Action::OpenRequestPayload(command_parts[2].into()));
+      }
+      return Some(Action::TimedStatusLine("invalid request args. request open <payload-file-name>".into(), 3));
+    }
+    if command_args.starts_with("response ") || command_args.starts_with("s ") {
+      let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
+      if command_parts.len() == 3 && command_parts[1].eq("save") {
+        return Some(Action::SaveResponsePayload(command_parts[2].into()));
+      }
+      return Some(Action::TimedStatusLine("invalid response args. response save <payload-file-name>".into(), 3));
+    }
+    Some(Action::TimedStatusLine(
+      "unknown command. available commands are: send, query, header, request, response".into(),
+      3,
+    ))
+  }
 }
 
 impl Page for Phone {
@@ -206,13 +257,7 @@ impl Page for Phone {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           pane.update(Action::Focus, state)?;
         }
-        if args.eq("q") {
-          actions.push(Some(Action::Quit));
-        } else if args.eq("send") || args.eq("s") {
-          actions.push(Some(Action::Dial));
-        } else {
-          actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
-        }
+        actions.push(self.handle_commands(args));
       },
       Action::FooterResult(_cmd, None) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {

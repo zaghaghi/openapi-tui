@@ -60,10 +60,13 @@ impl Pane for FooterPane {
         self.input.handle_event(&Event::Key(key));
         let response = match key.code {
           KeyCode::Enter => {
-            self.command_history.push_front(self.input.to_string());
-            self.command_history.truncate(CONFIG.max_command_history);
-            self.command_history_index = None;
-            Some(EventResponse::Stop(Action::FooterResult(self.command.clone(), Some(self.input.to_string()))))
+            let command = self.input.to_string();
+            if !command.is_empty() {
+              self.command_history.push_front(self.input.to_string());
+              self.command_history.truncate(CONFIG.max_command_history);
+              self.command_history_index = None;
+            }
+            Some(EventResponse::Stop(Action::FooterResult(self.command.clone(), Some(command))))
           },
           KeyCode::Esc => {
             self.command_history_index = None;
