@@ -192,8 +192,8 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Refactor footer, add flash footer messages
 
 # Next Release
-- [ ] Import request body file
-- [ ] Save response body and header
+- [X] Import request body file
+- [X] Save response body and header
 - [X] Command history with ↑/↓
 - [X] Support array query strings
 - [X] Suppert extra headers

@@ -145,7 +145,7 @@ impl Pane for BodyEditor<'_> {
             self.input = TextArea::from(item.lines());
           })
         {
-          return Ok(Some(Action::TimedStatusLine(format!("Can't open or read file content: {error}"), 5)));
+          return Ok(Some(Action::TimedStatusLine(format!("can't open or read file content: {error}"), 5)));
         }
       },
       _ => {},

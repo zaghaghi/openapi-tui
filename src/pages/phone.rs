@@ -261,6 +261,9 @@ impl Page for Phone {
           for pane in self.panes.iter_mut() {
             actions.push(pane.update(action.clone(), state)?);
           }
+          if let Action::TimedStatusLine(_, _) = action {
+            actions.push(Some(action))
+          }
         }
       },
       Action::FooterResult(_cmd, None) => {
