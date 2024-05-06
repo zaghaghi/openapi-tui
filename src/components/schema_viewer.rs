@@ -169,7 +169,10 @@ impl SchemaViewer {
   }
 
   fn set_styles_by_name(&mut self, schema_name: String) -> Result<()> {
-    let schema = self.components.get(schema_name.as_str()).unwrap();
-    self.set_styles(schema.clone())
+    if let Some(schema) = self.components.get(schema_name.as_str()) {
+      self.set_styles(schema.clone())
+    } else {
+      Ok(())
+    }
   }
 }

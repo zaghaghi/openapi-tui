@@ -190,8 +190,6 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Plain Response Viewer (Status + Headers + Body)
 - [X] History viewer
 - [X] Refactor footer, add flash footer messages
-
-# Next Release
 - [X] Import request body file
 - [X] Save response body and header
 - [X] Command history with ↑/↓
