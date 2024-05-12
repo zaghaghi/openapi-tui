@@ -188,20 +188,26 @@ impl RequestBuilder for ParameterEditor {
   fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     let query_params = self
       .query_parameters()
-      .map(|query_param| (query_param.name.clone(), query_param.value.clone().unwrap_or_default()))
+      .filter_map(|query_param| {
+        let name = query_param.name.clone();
+        let value = query_param.value.clone();
+        if !query_param.required && value.is_none() {
+          return None;
+        }
+        Some((name, value.unwrap()))
+      })
       .collect::<Vec<_>>();
 
     let header_params = self
       .header_parameters()
-      .filter_map(|query_param| {
-        let name = query_param.name.as_str();
-        let value = query_param.value.as_deref().unwrap_or_default();
+      .filter_map(|header_param| {
+        let name = header_param.name.as_str();
+        let value = header_param.value.as_deref().unwrap_or_default();
         HeaderName::from_str(name)
           .ok()
           .and_then(|header_name| HeaderValue::from_str(value).ok().map(|header_value| (header_name, header_value)))
       })
       .collect::<HeaderMap<_>>();
-
     request.query(&query_params).headers(header_params)
   }
 }
