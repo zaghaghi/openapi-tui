@@ -26,6 +26,14 @@ Sleep 2s
 Enter
 Type "tag1"
 Enter
+Type ":"
+Type@0.5s "query add tags"
+Sleep 1s
+Enter
+Type "j"
+Enter
+Type "tag2"
+Enter
 Type "l"
 Type "l"
 Enter
