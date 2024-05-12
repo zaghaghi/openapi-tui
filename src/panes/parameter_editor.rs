@@ -208,7 +208,6 @@ impl RequestBuilder for ParameterEditor {
           .and_then(|header_name| HeaderValue::from_str(value).ok().map(|header_value| (header_name, header_value)))
       })
       .collect::<HeaderMap<_>>();
-    tracing::info!("{:?}", query_params);
     request.query(&query_params).headers(header_params)
   }
 }
