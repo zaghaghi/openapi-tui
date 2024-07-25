@@ -32,12 +32,10 @@ impl HistoryPane {
     let history = operation_ids
       .iter()
       .filter_map(|opertation_item| {
-        opertation_item.operation.operation_id.as_ref().map(|operation_id| {
-          OperationHistoryItem {
-            operation_id: operation_id.clone(),
-            method: opertation_item.method.clone(),
-            path: opertation_item.path.clone(),
-          }
+        opertation_item.operation.operation_id.as_ref().map(|operation_id| OperationHistoryItem {
+          operation_id: operation_id.clone(),
+          method: opertation_item.method.clone(),
+          path: opertation_item.path.clone(),
         })
       })
       .collect::<Vec<OperationHistoryItem>>();

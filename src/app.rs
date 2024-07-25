@@ -93,8 +93,24 @@ impl App {
           .popup
           .as_mut()
           .and_then(|pane| pane.handle_events(e.clone(), &mut self.state).ok())
-          .map(|response| {
-            match response {
+          .map(|response| match response {
+            Some(tui::EventResponse::Continue(action)) => {
+              action_tx.send(action).ok();
+              false
+            },
+            Some(tui::EventResponse::Stop(action)) => {
+              action_tx.send(action).ok();
+              true
+            },
+            _ => false,
+          })
+          .unwrap_or(false);
+        stop_event_propagation = stop_event_propagation
+          || self
+            .pages
+            .get_mut(self.active_page)
+            .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
+            .map(|response| match response {
               Some(tui::EventResponse::Continue(action)) => {
                 action_tx.send(action).ok();
                 false
@@ -104,26 +120,6 @@ impl App {
                 true
               },
               _ => false,
-            }
-          })
-          .unwrap_or(false);
-        stop_event_propagation = stop_event_propagation
-          || self
-            .pages
-            .get_mut(self.active_page)
-            .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
-            .map(|response| {
-              match response {
-                Some(tui::EventResponse::Continue(action)) => {
-                  action_tx.send(action).ok();
-                  false
-                },
-                Some(tui::EventResponse::Stop(action)) => {
-                  action_tx.send(action).ok();
-                  true
-                },
-                _ => false,
-              }
             })
             .unwrap_or(false);
 
@@ -131,18 +127,16 @@ impl App {
           || self
             .footer
             .handle_events(e.clone(), &mut self.state)
-            .map(|response| {
-              match response {
-                Some(tui::EventResponse::Continue(action)) => {
-                  action_tx.send(action).ok();
-                  false
-                },
-                Some(tui::EventResponse::Stop(action)) => {
-                  action_tx.send(action).ok();
-                  true
-                },
-                _ => false,
-              }
+            .map(|response| match response {
+              Some(tui::EventResponse::Continue(action)) => {
+                action_tx.send(action).ok();
+                false
+              },
+              Some(tui::EventResponse::Stop(action)) => {
+                action_tx.send(action).ok();
+                true
+              },
+              _ => false,
             })
             .unwrap_or(false);
 
@@ -273,13 +267,16 @@ impl App {
 
       while let Ok(request) = request_rx.try_recv() {
         if let Ok(response) = reqwest::Client::new().execute(request.request).await {
-          self.state.responses.insert(request.operation_id, Response {
-            status: response.status(),
-            version: response.version(),
-            headers: response.headers().clone(),
-            content_length: response.content_length(),
-            body: response.text().await?.clone(),
-          });
+          self.state.responses.insert(
+            request.operation_id,
+            Response {
+              status: response.status(),
+              version: response.version(),
+              headers: response.headers().clone(),
+              content_length: response.content_length(),
+              body: response.text().await?.clone(),
+            },
+          );
         }
       }
 

@@ -161,11 +161,9 @@ impl Page for Home {
           KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => EventResponse::Stop(Action::Up),
           KeyCode::Char('g') | KeyCode::Char('G') => EventResponse::Stop(Action::Go),
           KeyCode::Backspace | KeyCode::Char('b') | KeyCode::Char('B') => EventResponse::Stop(Action::Back),
-          KeyCode::Enter => {
-            EventResponse::Stop(Action::NewCall(
-              state.active_operation().and_then(|op| op.operation.operation_id.clone()),
-            ))
-          },
+          KeyCode::Enter => EventResponse::Stop(Action::NewCall(
+            state.active_operation().and_then(|op| op.operation.operation_id.clone()),
+          )),
           KeyCode::Char('f') | KeyCode::Char('F') => EventResponse::Stop(Action::ToggleFullScreen),
           KeyCode::Char(c) if ('1'..='9').contains(&c) => {
             EventResponse::Stop(Action::Tab(c.to_digit(10).unwrap_or(0) - 1))
