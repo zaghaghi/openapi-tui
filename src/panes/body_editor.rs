@@ -52,8 +52,7 @@ impl<'a> BodyEditor<'a> {
   }
 }
 
-impl RequestPane for BodyEditor<'_> {
-}
+impl RequestPane for BodyEditor<'_> {}
 
 impl RequestBuilder for BodyEditor<'_> {
   fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -92,14 +91,12 @@ impl Pane for BodyEditor<'_> {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => {
-        match key.code {
-          KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
-          _ => {
-            self.input.input(key);
-            Ok(Some(EventResponse::Stop(Action::Noop)))
-          },
-        }
+      InputMode::Insert => match key.code {
+        KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
+        _ => {
+          self.input.input(key);
+          Ok(Some(EventResponse::Stop(Action::Noop)))
+        },
       },
       _ => Ok(None),
     }
@@ -154,8 +151,7 @@ impl Pane for BodyEditor<'_> {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
-    let inner = area.inner(&margin_h1_v1);
+    let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
 
     if self.focused && state.input_mode == InputMode::Insert {
       self.input.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
