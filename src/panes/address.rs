@@ -78,31 +78,26 @@ impl Pane for AddressPane {
         String::from("http://localhost")
       };
       let title = operation_item.operation.summary.clone().unwrap_or_default();
-      const INNER_MARGIN: Margin = Margin { horizontal: 1, vertical: 1 };
 
-      let inner = area.inner(&INNER_MARGIN);
+      let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
       frame.render_widget(
         match operation_item.r#type {
-          OperationItemType::Path => {
-            Paragraph::new(Line::from(vec![
-              Span::styled(
-                format!("{:7}", operation_item.method.as_str()),
-                Style::default().fg(Self::method_color(operation_item.method.as_str())),
-              ),
-              Span::styled(base_url, Style::default().fg(Color::DarkGray)),
-              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
-            ]))
-          },
-          OperationItemType::Webhook => {
-            Paragraph::new(Line::from(vec![
-              Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
-              Span::styled(
-                format!("{} ", operation_item.method.as_str()),
-                Style::default().fg(Self::method_color(operation_item.method.as_str())),
-              ),
-              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
-            ]))
-          },
+          OperationItemType::Path => Paragraph::new(Line::from(vec![
+            Span::styled(
+              format!("{:7}", operation_item.method.as_str()),
+              Style::default().fg(Self::method_color(operation_item.method.as_str())),
+            ),
+            Span::styled(base_url, Style::default().fg(Color::DarkGray)),
+            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+          ])),
+          OperationItemType::Webhook => Paragraph::new(Line::from(vec![
+            Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
+            Span::styled(
+              format!("{} ", operation_item.method.as_str()),
+              Style::default().fg(Self::method_color(operation_item.method.as_str())),
+            ),
+            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+          ])),
         },
         inner,
       );

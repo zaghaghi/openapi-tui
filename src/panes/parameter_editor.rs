@@ -171,8 +171,7 @@ impl ParameterEditor {
   }
 }
 
-impl RequestPane for ParameterEditor {
-}
+impl RequestPane for ParameterEditor {}
 
 impl RequestBuilder for ParameterEditor {
   fn path(&self, url: String) -> String {
@@ -224,14 +223,12 @@ impl Pane for ParameterEditor {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => {
-        match key.code {
-          KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
-          _ => {
-            self.input.handle_event(&Event::Key(key));
-            Ok(Some(EventResponse::Stop(Action::Noop)))
-          },
-        }
+      InputMode::Insert => match key.code {
+        KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
+        _ => {
+          self.input.handle_event(&Event::Key(key));
+          Ok(Some(EventResponse::Stop(Action::Noop)))
+        },
       },
       _ => Ok(None),
     }
@@ -355,8 +352,7 @@ impl Pane for ParameterEditor {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
-    let inner = area.inner(&margin_h1_v1);
+    let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
 
     frame.render_widget(
       Tabs::new(self.parameters.iter().map(|item| {

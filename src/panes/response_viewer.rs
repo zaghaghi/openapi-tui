@@ -43,8 +43,7 @@ impl ResponseViewer {
   }
 }
 
-impl RequestPane for ResponseViewer {
-}
+impl RequestPane for ResponseViewer {}
 
 impl RequestBuilder for ResponseViewer {
   fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -128,8 +127,7 @@ impl Pane for ResponseViewer {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
-    let margin_h1_v1: Margin = Margin { horizontal: 1, vertical: 1 };
-    let inner = area.inner(&margin_h1_v1);
+    let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
     let inner_panes = Layout::horizontal([Constraint::Fill(3), Constraint::Fill(1)]).split(inner);
 
     let mut status_line = String::default();

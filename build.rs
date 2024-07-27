@@ -1,4 +1,6 @@
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-  vergen::EmitBuilder::builder().all_build().all_git().emit()?;
-  Ok(())
+use anyhow::Result;
+use vergen_git2::{BuildBuilder, Emitter, Git2Builder};
+
+pub fn main() -> Result<()> {
+  Emitter::default().add_instructions(&BuildBuilder::all_build()?)?.add_instructions(&Git2Builder::all_git()?)?.emit()
 }

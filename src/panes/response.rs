@@ -180,9 +180,7 @@ impl Pane for ResponsePane {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, _state: &State) -> Result<()> {
-    let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
-
-    let inner = area.inner(&inner_margin);
+    let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
     frame.render_widget(
       Tabs::new(self.schemas.iter().map(|resp| {
         Span::styled(
@@ -195,8 +193,7 @@ impl Pane for ResponsePane {
       inner,
     );
 
-    let inner_margin: Margin = Margin { horizontal: 1, vertical: 1 };
-    let mut inner = inner.inner(&inner_margin);
+    let mut inner = inner.inner(Margin { horizontal: 1, vertical: 1 });
     inner.height = inner.height.saturating_add(1);
     self.schema_viewer.render_widget(frame, inner);
 
