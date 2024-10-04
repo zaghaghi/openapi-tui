@@ -24,7 +24,7 @@ clap = { version = "4.5.4", features = [
 ] }
 color-eyre = "0.6.3"
 config = "0.14.0"
-crossterm = { version = "0.27.0", features = ["serde", "event-stream"] }
+crossterm = { version = "0.28.1", features = ["serde", "event-stream"] }
 derive_deref = "1.1.1"
 directories = "5.0.1"
 futures = "0.3.30"
@@ -36,23 +36,23 @@ libc = "0.2.153"
 log = "0.4.21"
 openapi-31 = { version = "0.4.0" }
 pretty_assertions = "1.4.0"
-ratatui = { version = "0.27.0", features = ["serde", "macros"] }
+ratatui = { version = "0.28.1", features = ["serde", "macros"] }
 reqwest = { version = "0.12.2", features = ["native-tls-vendored"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.115"
-serde_yaml = "0.9.34-deprecated"
+serde_yaml = "0.9.34+deprecated"
 signal-hook = "0.3.17"
 strip-ansi-escapes = "0.2.0"
 strum = { version = "0.26.2", features = ["derive"] }
 syntect = "5.2.0"
-syntect-tui = "3.0.3"
+syntect-tui = "3.0.4"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-util = "0.7.10"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "serde"] }
-tui-input = "0.9.0"
-tui-textarea = "0.5.1"
+tui-input = "0.10.1"
+tui-textarea = "0.6.1"
 
 [build-dependencies]
 anyhow = "1.0.86"
