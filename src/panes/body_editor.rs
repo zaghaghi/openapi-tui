@@ -161,7 +161,7 @@ impl Pane for BodyEditor<'_> {
 
     if !self.content_types.is_empty() {
       if !self.input.is_empty() || state.input_mode == InputMode::Insert {
-        frame.render_widget(self.input.widget(), inner);
+        frame.render_widget(&self.input, inner);
       } else {
         frame.render_widget(
           Paragraph::new(

@@ -3,10 +3,7 @@ use std::{str::FromStr, sync::Arc};
 use color_eyre::eyre::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use openapi_31::v31::parameter::In;
-use ratatui::{
-  prelude::*,
-  widgets::{block::*, *},
-};
+use ratatui::{prelude::*, widgets::*};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
@@ -420,7 +417,10 @@ impl Pane for ParameterEditor {
             Span::styled(self.input.value(), Style::default().fg(Color::LightBlue)).not_dim()
           ]))
           .scroll((0, scroll as u16));
-        frame.set_cursor(input_area.x + self.input.visual_cursor().saturating_sub(scroll) as u16, input_area.y);
+        frame.set_cursor_position(Position::new(
+          input_area.x + self.input.visual_cursor().saturating_sub(scroll) as u16,
+          input_area.y,
+        ));
         frame.render_widget(input, input_area);
       }
     }

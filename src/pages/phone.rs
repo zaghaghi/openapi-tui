@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{ContextCompat, Result};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
   prelude::*,
@@ -27,6 +27,7 @@ pub struct Phone {
   focused_pane_index: usize,
   panes: Vec<Box<dyn RequestPane>>,
   fullscreen_pane_index: Option<usize>,
+  base_urls: VecDeque<String>,
 }
 
 pub trait RequestBuilder {
@@ -42,12 +43,13 @@ pub trait RequestBuilder {
 pub trait RequestPane: Pane + RequestBuilder {}
 
 impl Phone {
-  pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>) -> Result<Self> {
+  pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>, state: &State) -> Result<Self> {
     let focused_border_style = Style::default().fg(Color::LightGreen);
     let operation_item = Arc::new(operation_item);
     let parameter_editor = ParameterEditor::new(operation_item.clone(), true, focused_border_style);
     let body_editor = BodyEditor::new(operation_item.clone(), false, focused_border_style);
     let response_viewer = ResponseViewer::new(operation_item.clone(), false, focused_border_style);
+    let base_urls = Phone::default_base_urls(&operation_item, state);
     Ok(Self {
       operation_item,
       command_tx: None,
@@ -56,6 +58,7 @@ impl Phone {
       panes: vec![Box::new(parameter_editor), Box::new(body_editor), Box::new(response_viewer)],
       focused_pane_index: 0,
       fullscreen_pane_index: None,
+      base_urls,
     })
   }
 
@@ -69,21 +72,13 @@ impl Phone {
     }
   }
 
-  fn base_url(&self, state: &State) -> String {
-    if let Some(server) = state.openapi_spec.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-      String::from(server.url.trim_end_matches('/'))
-    } else if let Some(server) = &self.operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-      String::from(server.url.trim_end_matches('/'))
-    } else {
-      String::from("http://localhost")
-    }
+  fn default_base_urls(operation_item: &OperationItem, state: &State) -> VecDeque<String> {
+    state.default_server_urls(&operation_item.operation.servers).into()
   }
 
-  fn build_request(&self, state: &State) -> Result<reqwest::Request> {
-    let url = self
-      .panes
-      .iter()
-      .fold(format!("{}{}", self.base_url(state), self.operation_item.path), |url, pane| pane.path(url));
+  fn build_request(&self) -> Result<reqwest::Request> {
+    let base_url = self.base_urls.front().context("no base url found")?;
+    let url = self.panes.iter().fold(format!("{}{}", base_url, self.operation_item.path), |url, pane| pane.path(url));
     let method = reqwest::Method::from_bytes(self.operation_item.method.as_bytes())?;
     let request_builder = self
       .panes
@@ -232,6 +227,16 @@ impl Page for Phone {
           actions.push(pane.update(Action::Focus, state)?);
         }
       },
+      Action::Up => {
+        if let Some(front) = self.base_urls.pop_front() {
+          self.base_urls.push_back(front);
+        }
+      },
+      Action::Down => {
+        if let Some(back) = self.base_urls.pop_back() {
+          self.base_urls.push_front(back);
+        }
+      },
       Action::ToggleFullScreen => {
         self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
       },
@@ -243,7 +248,7 @@ impl Page for Phone {
       Action::Dial => {
         if let Some(request_tx) = &self.request_tx {
           request_tx.send(Request {
-            request: self.build_request(state)?,
+            request: self.build_request()?,
             operation_id: self.operation_item.operation.operation_id.clone().unwrap_or_default(),
           })?;
         }
@@ -286,6 +291,8 @@ impl Page for Phone {
   }
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
+    let base_url = self.base_urls.front().context("no base url found")?;
+
     let outer_layout =
       Layout::vertical(vec![Constraint::Max(3), self.panes[1].height_constraint(), self.panes[2].height_constraint()])
         .split(area);
@@ -295,7 +302,7 @@ impl Page for Phone {
           format!(" {} ", self.operation_item.method.as_str()),
           Style::default().fg(Self::method_color(self.operation_item.method.as_str())),
         ),
-        Span::styled(self.base_url(state), Style::default().fg(Color::DarkGray)),
+        Span::styled(base_url, Style::default().fg(Color::DarkGray)),
         Span::styled(&self.operation_item.path, Style::default().fg(Color::White)),
       ]))
       .block(

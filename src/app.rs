@@ -205,7 +205,7 @@ impl App {
                   self.pages[0].unfocus()?;
                   self.pages.insert(0, page);
                   self.pages[0].focus()?;
-                } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone()) {
+                } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone(), &self.state) {
                   self.pages[0].unfocus()?;
                   page.init(&self.state)?;
                   page.register_action_handler(action_tx.clone())?;
@@ -296,7 +296,7 @@ impl App {
 
   fn draw(&mut self, frame: &mut tui::Frame<'_>) -> Result<()> {
     let vertical_layout =
-      Layout::vertical(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)]).split(frame.size());
+      Layout::vertical(vec![Constraint::Max(1), Constraint::Fill(1), Constraint::Max(1)]).split(frame.area());
 
     self.header.draw(frame, vertical_layout[0], &self.state)?;
 
@@ -306,7 +306,7 @@ impl App {
 
     if let Some(popup) = &mut self.popup {
       let popup_vertical_layout =
-        Layout::vertical(vec![Constraint::Fill(1), popup.height_constraint(), Constraint::Fill(1)]).split(frame.size());
+        Layout::vertical(vec![Constraint::Fill(1), popup.height_constraint(), Constraint::Fill(1)]).split(frame.area());
       let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1), Constraint::Fill(1)])
         .split(popup_vertical_layout[1]);
       popup.draw(frame, popup_layout[1], &self.state)?;

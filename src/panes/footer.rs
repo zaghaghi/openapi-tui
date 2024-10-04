@@ -140,10 +140,10 @@ impl Pane for FooterPane {
       .scroll((0, scroll as u16));
       frame.render_widget(input, area);
 
-      frame.set_cursor(
+      frame.set_cursor_position(Position::new(
         area.x + ((self.input.visual_cursor()).max(scroll) - scroll) as u16 + self.command.len() as u16,
         area.y + 1,
-      )
+      ))
     } else {
       frame.render_widget(
         Line::from(vec![Span::styled(self.get_status_line(), Style::default())])

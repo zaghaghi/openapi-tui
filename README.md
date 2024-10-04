@@ -54,6 +54,9 @@ Options:
 ## Call Endpoints
 ![call](static/call.gif)
 
+## Multiple Server Support
+![call](static/switch-server.gif)
+
 </details>
 
 <br />
@@ -169,6 +172,11 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `request`, `r` | Load request payload. e.g. `request open /home/hamed/payload.json` |
 | `response`, `s` | Save response payload e.g/ `response save /home/hamed/result.json` |
 
+# Environment Variables
+| Variable | Description |
+|:---------|:------------|
+| `OPENAPI_TUI_DEFAULT_SERVER` | Add a custom server url to the list of servers|
+
 
 # Implemented Features
 - [X] Viewer
@@ -195,6 +203,7 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Command history with ↑/↓
 - [X] Support array query strings
 - [X] Suppert extra headers
+- [X] Support multiple servers
 
 # Backlog
 - [ ] Schema Types (openapi-31)
