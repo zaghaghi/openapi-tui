@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use color_eyre::eyre::Result;
 use ratatui::{
   prelude::*,
@@ -15,11 +17,12 @@ use crate::{
 pub struct AddressPane {
   focused: bool,
   focused_border_style: Style,
+  base_urls: VecDeque<String>,
 }
 
 impl AddressPane {
   pub fn new(focused: bool, focused_border_style: Style) -> Self {
-    Self { focused, focused_border_style }
+    Self { focused, focused_border_style, base_urls: VecDeque::new() }
   }
 
   fn border_style(&self) -> Style {
@@ -51,6 +54,11 @@ impl Pane for AddressPane {
     Constraint::Max(3)
   }
 
+  fn init(&mut self, state: &State) -> Result<()> {
+    self.base_urls = state.default_server_urls(&None).into();
+    Ok(())
+  }
+
   fn update(&mut self, action: Action, _state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Focus => {
@@ -61,8 +69,19 @@ impl Pane for AddressPane {
       Action::UnFocus => {
         self.focused = false;
       },
+      Action::Up => {
+        if let Some(front) = self.base_urls.pop_front() {
+          self.base_urls.push_back(front.to_string());
+        }
+      },
+      Action::Down => {
+        if let Some(back) = self.base_urls.pop_back() {
+          self.base_urls.push_front(back.to_string());
+        }
+      },
       Action::Update => {},
       Action::Submit => {},
+
       _ => {},
     }
     Ok(None)
@@ -70,13 +89,7 @@ impl Pane for AddressPane {
 
   fn draw(&mut self, frame: &mut Frame<'_>, area: Rect, state: &State) -> Result<()> {
     if let Some(operation_item) = state.active_operation() {
-      let base_url = if let Some(server) = state.openapi_spec.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-        String::from(server.url.trim_end_matches('/'))
-      } else if let Some(server) = operation_item.operation.servers.as_ref().map(|v| v.first()).unwrap_or(None) {
-        String::from(server.url.trim_end_matches('/'))
-      } else {
-        String::from("http://localhost")
-      };
+      let base_url = self.base_urls.front().cloned().unwrap_or(String::new());
       let title = operation_item.operation.summary.clone().unwrap_or_default();
 
       let inner = area.inner(Margin { horizontal: 1, vertical: 1 });

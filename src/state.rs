@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env};
 
 use color_eyre::eyre::Result;
-use openapi_31::v31::{Openapi, Operation};
+use openapi_31::v31::{Openapi, Operation, Server};
 
 use crate::response::Response;
 
@@ -142,6 +142,36 @@ impl State {
         .filter(|flat_operation| flat_operation.path.contains(self.active_filter.as_str()))
         .count()
     }
+  }
+
+  fn default_url(server: &Server) -> String {
+    let mut url = server.url.clone();
+    if let Some(variables) = &server.variables {
+      for (k, v) in variables {
+        url = url.replace(format!("{{{}}}", k).as_str(), &v.default);
+      }
+    }
+    url.trim_end_matches('/').to_string()
+  }
+
+  pub fn default_server_urls(&self, extra_servers: &Option<Vec<Server>>) -> Vec<String> {
+    let mut result = vec![];
+    if let Ok(url) = env::var("OPENAPI_TUI_DEFAULT_SERVER") {
+      result.push(url.trim_end_matches('/').to_string());
+    }
+
+    extra_servers.iter().flatten().for_each(|server| {
+      result.push(State::default_url(server));
+    });
+
+    self.openapi_spec.servers.iter().flatten().for_each(|server| {
+      result.push(State::default_url(server));
+    });
+
+    if result.is_empty() {
+      result.push("http://localhost".to_string());
+    }
+    result
   }
 }
 

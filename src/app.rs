@@ -205,7 +205,7 @@ impl App {
                   self.pages[0].unfocus()?;
                   self.pages.insert(0, page);
                   self.pages[0].focus()?;
-                } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone()) {
+                } else if let Ok(mut page) = Phone::new(operation_item.clone(), request_tx.clone(), &self.state) {
                   self.pages[0].unfocus()?;
                   page.init(&self.state)?;
                   page.register_action_handler(action_tx.clone())?;

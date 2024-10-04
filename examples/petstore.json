@@ -20,6 +20,21 @@
     "servers": [
         {
             "url": "https://petstore3.swagger.io/api/v3"
+        },
+        {
+            "url": "https://petstore3.swagger.local:{port}/api/{version}",
+            "variables": {
+                "port": {
+                    "default": "80",
+                    "enum": [
+                        "80",
+                        "8080"
+                    ]
+                },
+                "version": {
+                    "default": "v3"
+                }
+            }
         }
     ],
     "tags": [
