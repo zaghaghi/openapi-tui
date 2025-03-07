@@ -177,6 +177,6 @@ impl State {
 
 impl OperationItem {
   pub fn has_tag(&self, tag: &String) -> bool {
-    self.operation.tags.as_ref().map_or(false, |tags| tags.contains(tag))
+    self.operation.tags.as_ref().is_some_and(|tags| tags.contains(tag))
   }
 }

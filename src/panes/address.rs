@@ -8,6 +8,7 @@ use ratatui::{
 
 use crate::{
   action::Action,
+  pages::phone::{RequestBuilder, RequestPane},
   panes::Pane,
   state::{OperationItemType, State},
   tui::Frame,
@@ -49,6 +50,15 @@ impl AddressPane {
     }
   }
 }
+
+impl RequestPane for AddressPane {}
+
+impl RequestBuilder for AddressPane {
+  fn path(&self, url: String) -> String {
+    format!("{}{}", self.base_urls.front().cloned().unwrap_or_default(), url)
+  }
+}
+
 impl Pane for AddressPane {
   fn height_constraint(&self) -> Constraint {
     Constraint::Max(3)
