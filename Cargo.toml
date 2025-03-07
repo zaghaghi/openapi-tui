@@ -23,10 +23,10 @@ clap = { version = "4.5.4", features = [
     "unstable-styles",
 ] }
 color-eyre = "0.6.3"
-config = "0.14.0"
+config = "0.15.9"
 crossterm = { version = "0.28.1", features = ["serde", "event-stream"] }
 derive_deref = "1.1.1"
-directories = "5.0.1"
+directories = "6.0.0"
 futures = "0.3.30"
 human-panic = "2.0.0"
 humansize = "2.1.3"
@@ -36,23 +36,23 @@ libc = "0.2.153"
 log = "0.4.21"
 openapi-31 = { version = "0.4.0" }
 pretty_assertions = "1.4.0"
-ratatui = { version = "0.28.1", features = ["serde", "macros"] }
+ratatui = { version = "0.29.0", features = ["serde", "macros"] }
 reqwest = { version = "0.12.2", features = ["native-tls-vendored"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.115"
-serde_yaml = "0.9.34+deprecated"
+serde_yaml = "0.9.34"
 signal-hook = "0.3.17"
 strip-ansi-escapes = "0.2.0"
-strum = { version = "0.26.2", features = ["derive"] }
+strum = { version = "0.27.1", features = ["derive"] }
 syntect = "5.2.0"
-syntect-tui = "3.0.4"
+syntect-tui = "3.0.5"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-util = "0.7.10"
 tracing = "0.1.40"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter", "serde"] }
-tui-input = "0.10.1"
-tui-textarea = "0.6.1"
+tui-input = "0.11.1"
+tui-textarea = "0.7.0"
 
 [build-dependencies]
 anyhow = "1.0.86"

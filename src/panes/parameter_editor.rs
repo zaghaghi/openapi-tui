@@ -134,7 +134,7 @@ impl ParameterEditor {
     Ok(())
   }
 
-  fn select_parameters<'a>(&'a self, parameter_type: &'a str) -> impl Iterator<Item = &ParameterItem> + 'a {
+  fn select_parameters<'a>(&'a self, parameter_type: &'a str) -> impl Iterator<Item = &'a ParameterItem> + 'a {
     self
       .parameters
       .iter()
@@ -390,7 +390,7 @@ impl Pane for ParameterEditor {
         let table = Table::new(rows, vec![column_widths[0].width, column_widths[1].width])
           .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
           .highlight_spacing(HighlightSpacing::Always)
-          .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+          .row_highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(table, inner, &mut parameters.table_state);
       } else {
