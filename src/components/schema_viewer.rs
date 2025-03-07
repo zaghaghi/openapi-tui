@@ -122,14 +122,7 @@ impl SchemaViewer {
 
   pub fn render_widget(&self, frame: &mut Frame<'_>, area: Rect) {
     let lines = self.styles.iter().map(|items| {
-      return Line::from(
-        items
-          .iter()
-          .map(|item| {
-            return Span::styled(&item.1, item.0.bg(Color::Reset));
-          })
-          .collect::<Vec<_>>(),
-      );
+      Line::from(items.iter().map(|item| Span::styled(&item.1, item.0.bg(Color::Reset))).collect::<Vec<_>>())
     });
     let mut list_state = ListState::default().with_selected(Some(self.line_offset));
 
