@@ -25,7 +25,7 @@ pub struct BodyEditor<'a> {
   content_type_index: usize,
 }
 
-impl<'a> BodyEditor<'a> {
+impl BodyEditor<'_> {
   pub fn new(operation_item: Arc<OperationItem>, focused: bool, focused_border_style: Style) -> Self {
     Self {
       operation_item,
@@ -103,26 +103,24 @@ impl Pane for BodyEditor<'_> {
   }
 
   fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
-    if self.content_types.is_empty() {
-      return Ok(None);
-    }
+    let editable = !self.content_types.is_empty();
     match action {
       Action::Update => {},
-      Action::Submit if state.input_mode == InputMode::Normal => {
+      Action::Submit if state.input_mode == InputMode::Normal && editable => {
         state.input_mode = InputMode::Insert;
       },
-      Action::Submit if state.input_mode == InputMode::Insert => {
+      Action::Submit if state.input_mode == InputMode::Insert && editable => {
         state.input_mode = InputMode::Normal;
       },
       Action::Tab(index) if index < self.content_types.len().try_into()? => {
         self.content_type_index = index.try_into()?;
       },
-      Action::TabNext => {
+      Action::TabNext if editable => {
         let next_tab_index = self.content_type_index + 1;
         self.content_type_index =
           if next_tab_index < self.content_types.len() { next_tab_index } else { self.content_type_index };
       },
-      Action::TabPrev => {
+      Action::TabPrev if editable => {
         self.content_type_index =
           if self.content_type_index > 0 { self.content_type_index - 1 } else { self.content_type_index };
       },
@@ -132,7 +130,7 @@ impl Pane for BodyEditor<'_> {
       Action::UnFocus => {
         self.focused = false;
       },
-      Action::OpenRequestPayload(filepath) => {
+      Action::OpenRequestPayload(filepath) if editable => {
         if let Err(error) = std::fs::File::open(filepath)
           .and_then(|mut file| {
             let mut buffer = String::new();
