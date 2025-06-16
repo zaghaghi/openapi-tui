@@ -181,7 +181,7 @@ impl RequestBuilder for ParameterEditor {
     })
   }
 
-  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+  fn request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     let query_params = self
       .query_parameters()
       .filter_map(|query_param| {
