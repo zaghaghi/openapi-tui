@@ -19,6 +19,7 @@ pub struct Home {
   panes: Vec<Box<dyn Pane>>,
   focused_pane_index: usize,
   fullscreen_pane_index: Option<usize>,
+  left_panel_width: u16,
 }
 
 impl Home {
@@ -38,6 +39,7 @@ impl Home {
 
       focused_pane_index: 0,
       fullscreen_pane_index: None,
+      left_panel_width: 30, // Default to 30% width
     })
   }
 }
@@ -54,7 +56,7 @@ impl Page for Home {
     if let Some(command_tx) = &self.command_tx {
       const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
       let status_line =
-        format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]");
+        format!("[l,h {ARROW} pane movement] [+/- {ARROW} resize panels] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]");
       command_tx.send(Action::StatusLine(status_line))?;
     }
     Ok(())
@@ -101,6 +103,12 @@ impl Page for Home {
       },
       Action::ToggleFullScreen => {
         self.fullscreen_pane_index = self.fullscreen_pane_index.map_or(Some(self.focused_pane_index), |_| None);
+      },
+      Action::IncreasePanelWidth => {
+        self.left_panel_width = (self.left_panel_width + 5).min(80); // Max 80%
+      },
+      Action::DecreasePanelWidth => {
+        self.left_panel_width = (self.left_panel_width.saturating_sub(5)).max(20); // Min 20%
       },
       Action::FocusFooter(..) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
@@ -172,6 +180,8 @@ impl Page for Home {
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
           KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter("/".into(), Some(state.active_filter.clone()))),
           KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
+          KeyCode::Char('+') | KeyCode::Char('=') => EventResponse::Stop(Action::IncreasePanelWidth),
+          KeyCode::Char('-') => EventResponse::Stop(Action::DecreasePanelWidth),
           _ => {
             return Ok(None);
           },
@@ -189,7 +199,10 @@ impl Page for Home {
     } else {
       let outer_layout = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(vec![Constraint::Fill(1), Constraint::Fill(3)])
+        .constraints(vec![
+          Constraint::Percentage(self.left_panel_width),
+          Constraint::Percentage(100 - self.left_panel_width),
+        ])
         .split(area);
 
       let left_panes = Layout::default()
