@@ -2,10 +2,7 @@ use std::ops::Not;
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyCode;
-use ratatui::{
-  prelude::*,
-  widgets::*,
-};
+use ratatui::{prelude::*, widgets::*};
 
 use crate::{
   action::Action,

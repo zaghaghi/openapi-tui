@@ -2,10 +2,7 @@ use std::{io::Write, sync::Arc};
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use ratatui::{
-  prelude::*,
-  widgets::*,
-};
+use ratatui::{prelude::*, widgets::*};
 
 use crate::{
   action::Action,

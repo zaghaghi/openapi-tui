@@ -1,9 +1,6 @@
 use color_eyre::eyre::Result;
 use openapi_31::v31::parameter::In;
-use ratatui::{
-  prelude::*,
-  widgets::*,
-};
+use ratatui::{prelude::*, widgets::*};
 
 use crate::{action::Action, components::schema_viewer::SchemaViewer, panes::Pane, state::State, tui::Frame};
 

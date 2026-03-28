@@ -319,7 +319,7 @@ impl Pane for ParameterEditor {
             .iter()
             .enumerate()
             .filter_map(|(index, item)| if item.name.eq(&header_name) { Some(index) } else { None })
-            .last()
+            .next_back()
           {
             param_tab.items.remove(last_header_index);
           }
@@ -337,7 +337,7 @@ impl Pane for ParameterEditor {
             .iter()
             .enumerate()
             .filter_map(|(index, item)| if item.name.eq(&query_name) { Some(index) } else { None })
-            .last()
+            .next_back()
           {
             param_tab.items.remove(last_query_index);
           }
