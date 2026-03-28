@@ -2,7 +2,7 @@ use color_eyre::eyre::Result;
 use openapi_31::v31::parameter::In;
 use ratatui::{
   prelude::*,
-  widgets::{block::*, *},
+  widgets::*,
 };
 
 use crate::{action::Action, components::schema_viewer::SchemaViewer, panes::Pane, state::State, tui::Frame};
@@ -123,7 +123,7 @@ impl RequestPane {
     Ok(())
   }
 
-  fn nested_schema_path_line(&self) -> Line {
+  fn nested_schema_path_line(&self) -> Line<'_> {
     let schema_path = self.schema_viewer.schema_path();
     if schema_path.is_empty() {
       return Line::default();

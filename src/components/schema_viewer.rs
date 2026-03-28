@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use color_eyre::eyre::Result;
 use ratatui::{prelude::*, widgets::*};
-use syntect::{easy::HighlightLines, highlighting::ThemeSet, parsing::SyntaxSet, util::LinesWithEndings};
+use syntect::{easy::HighlightLines, highlighting::{FontStyle as SyntectFontStyle, ThemeSet}, parsing::SyntaxSet, util::LinesWithEndings};
 
 use crate::state::State;
 
@@ -145,14 +145,26 @@ impl SchemaViewer {
         .highlight_line(line, &self.highlighter_syntax_set)?
         .into_iter()
         .map(|segment| {
-          (
-            syntect_tui::translate_style(segment.0)
-              .ok()
-              .unwrap_or_default()
-              .underline_color(Color::Reset)
-              .bg(Color::Reset),
-            segment.1.to_string(),
-          )
+          let fg = match segment.0.foreground {
+            syntect::highlighting::Color { r, g, b, a } if a > 0 => Some(Color::Rgb(r, g, b)),
+            _ => None,
+          };
+          let fs = segment.0.font_style;
+          let mut modifier = Modifier::empty();
+          if fs.contains(SyntectFontStyle::BOLD) {
+            modifier |= Modifier::BOLD;
+          }
+          if fs.contains(SyntectFontStyle::ITALIC) {
+            modifier |= Modifier::ITALIC;
+          }
+          if fs.contains(SyntectFontStyle::UNDERLINE) {
+            modifier |= Modifier::UNDERLINED;
+          }
+          let mut style = Style::default().add_modifier(modifier).underline_color(Color::Reset).bg(Color::Reset);
+          if let Some(fg) = fg {
+            style = style.fg(fg);
+          }
+          (style, segment.1.to_string())
         })
         .collect();
       line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num + 1)));

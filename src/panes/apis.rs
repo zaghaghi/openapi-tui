@@ -1,7 +1,7 @@
 use color_eyre::eyre::Result;
 use ratatui::{
   prelude::*,
-  widgets::{block::*, *},
+  widgets::*,
 };
 
 use crate::{

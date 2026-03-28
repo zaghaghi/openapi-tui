@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
   prelude::*,
-  widgets::{block::*, *},
+  widgets::*,
 };
 
 use crate::{

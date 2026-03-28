@@ -4,9 +4,9 @@ use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
   prelude::*,
-  widgets::{block::*, *},
+  widgets::*,
 };
-use tui_textarea::TextArea;
+use ratatui_textarea::TextArea;
 
 use crate::{
   action::Action,
