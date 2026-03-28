@@ -1,10 +1,7 @@
 use std::collections::VecDeque;
 
 use color_eyre::eyre::Result;
-use ratatui::{
-  prelude::*,
-  widgets::*,
-};
+use ratatui::{prelude::*, widgets::*};
 
 use crate::{
   action::Action,

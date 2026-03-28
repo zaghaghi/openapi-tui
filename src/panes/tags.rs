@@ -1,8 +1,5 @@
 use color_eyre::eyre::Result;
-use ratatui::{
-  prelude::*,
-  widgets::*,
-};
+use ratatui::{prelude::*, widgets::*};
 
 use crate::{action::Action, panes::Pane, state::State, tui::Frame};
 

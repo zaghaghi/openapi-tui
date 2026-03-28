@@ -2,7 +2,12 @@ use std::collections::HashMap;
 
 use color_eyre::eyre::Result;
 use ratatui::{prelude::*, widgets::*};
-use syntect::{easy::HighlightLines, highlighting::{FontStyle as SyntectFontStyle, ThemeSet}, parsing::SyntaxSet, util::LinesWithEndings};
+use syntect::{
+  easy::HighlightLines,
+  highlighting::{FontStyle as SyntectFontStyle, ThemeSet},
+  parsing::SyntaxSet,
+  util::LinesWithEndings,
+};
 
 use crate::state::State;
 
