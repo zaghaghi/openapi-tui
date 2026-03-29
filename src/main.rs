@@ -3,6 +3,7 @@ pub mod app;
 pub mod cli;
 pub mod components;
 pub mod config;
+pub mod formatters;
 pub mod pages;
 pub mod panes;
 pub mod request;

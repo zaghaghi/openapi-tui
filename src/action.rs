@@ -45,4 +45,6 @@ pub enum Action {
   RemoveHeader(String),
   OpenRequestPayload(String),
   SaveResponsePayload(String),
+  ApplyJqQuery(String),
+  ApplySearch(String),
 }
