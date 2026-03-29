@@ -214,9 +214,9 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Scroll response body with j/k
 - [X] JQ filter for JSON responses
 - [X] Text search in response body
+- [X] Request progress bar
 
 # Backlog
 - [ ] Schema Types (openapi-31)
 - [ ] Display Key Mappings in Popup
 - [ ] Read Spec from STDIN 
-- [ ] Request progress bar

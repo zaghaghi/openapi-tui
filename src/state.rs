@@ -1,4 +1,7 @@
-use std::{collections::HashMap, env};
+use std::{
+  collections::{HashMap, HashSet},
+  env,
+};
 
 use color_eyre::eyre::Result;
 use openapi_31::v31::{Openapi, Operation, Server};
@@ -15,6 +18,8 @@ pub struct State {
   pub active_filter: String,
   pub input_mode: InputMode,
   pub responses: HashMap<String, Response>,
+  pub pending_operations: HashSet<String>,
+  pub spinner_frame: usize,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -65,6 +70,8 @@ impl State {
       active_filter: String::default(),
       input_mode: InputMode::Normal,
       responses: HashMap::default(),
+      pending_operations: HashSet::default(),
+      spinner_frame: 0,
     })
   }
 
@@ -95,6 +102,8 @@ impl State {
       active_filter: String::default(),
       input_mode: InputMode::Normal,
       responses: HashMap::default(),
+      pending_operations: HashSet::default(),
+      spinner_frame: 0,
     })
   }
 

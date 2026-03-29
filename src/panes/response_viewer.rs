@@ -25,6 +25,7 @@ use crate::{
 };
 
 const SYNTAX_THEME: &str = "Solarized (dark)";
+const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 #[derive(Default, PartialEq)]
 enum ViewerMode {
@@ -358,13 +359,23 @@ impl Pane for ResponseViewer {
     let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
     let inner_panes = Layout::horizontal([Constraint::Fill(3), Constraint::Fill(1)]).split(inner);
 
+    let is_pending = self
+      .operation_item
+      .operation
+      .operation_id
+      .as_ref()
+      .map(|id| state.pending_operations.contains(id))
+      .unwrap_or(false);
+    let spinner_char = SPINNER_FRAMES[state.spinner_frame % SPINNER_FRAMES.len()];
+
     let mut status_line = String::default();
 
     if let Some(response) =
       self.operation_item.operation.operation_id.as_ref().and_then(|operation_id| state.responses.get(operation_id))
     {
+      let loading_prefix = if is_pending { format!("{spinner_char} ") } else { String::new() };
       status_line = format!(
-        "[{:?} {} {} {}]",
+        "{loading_prefix}[{:?} {} {} {}]",
         response.version,
         response.status.as_str(),
         symbols::DOT,
@@ -454,11 +465,16 @@ impl Pane for ResponseViewer {
         ),
         inner_panes[1],
       );
+    } else if is_pending {
+      frame.render_widget(
+        Paragraph::new(format!(" {spinner_char} Waiting for response…")).style(Style::default().fg(Color::LightCyan)),
+        inner,
+      );
     } else {
       frame.render_widget(
         Paragraph::new(" No response is available. Press enter or try [send] command.").style(Style::default().dim()),
         inner,
-      )
+      );
     }
 
     let content_types = if !self.content_types.is_empty() {

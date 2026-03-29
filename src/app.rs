@@ -67,6 +67,7 @@ impl App {
   pub async fn run(&mut self) -> Result<()> {
     let (action_tx, mut action_rx) = mpsc::unbounded_channel::<Action>();
     let (request_tx, mut request_rx) = mpsc::unbounded_channel::<Request>();
+    let (response_tx, mut response_rx) = mpsc::unbounded_channel::<(String, Option<Response>)>();
 
     let mut tui = tui::Tui::new()?;
     tui.enter()?;
@@ -174,6 +175,7 @@ impl App {
         match action {
           Action::Tick => {
             self.last_tick_key_events.drain(..);
+            self.state.spinner_frame = self.state.spinner_frame.wrapping_add(1);
           },
           Action::Quit if self.state.input_mode == InputMode::Normal => self.should_quit = true,
           Action::Suspend => self.should_suspend = true,
@@ -266,18 +268,29 @@ impl App {
       }
 
       while let Ok(request) = request_rx.try_recv() {
-        if let Ok(response) = reqwest::Client::new().execute(request.request).await {
-          self.state.responses.insert(
-            request.operation_id,
-            Response {
-              status: response.status(),
-              version: response.version(),
-              headers: response.headers().clone(),
-              content_length: response.content_length(),
-              body: response.text().await?.clone(),
-            },
-          );
+        self.state.pending_operations.insert(request.operation_id.clone());
+        let tx = response_tx.clone();
+        tokio::spawn(async move {
+          let result = async {
+            let http_response = reqwest::Client::new().execute(request.request).await?;
+            let status = http_response.status();
+            let version = http_response.version();
+            let headers = http_response.headers().clone();
+            let content_length = http_response.content_length();
+            let body = http_response.text().await?;
+            Ok::<Response, reqwest::Error>(Response { status, version, headers, content_length, body })
+          }
+          .await;
+          tx.send((request.operation_id, result.ok())).ok();
+        });
+      }
+
+      while let Ok((operation_id, maybe_response)) = response_rx.try_recv() {
+        self.state.pending_operations.remove(&operation_id);
+        if let Some(response) = maybe_response {
+          self.state.responses.insert(operation_id, response);
         }
+        action_tx.send(Action::Update).ok();
       }
 
       if self.should_suspend {
