@@ -118,8 +118,20 @@ impl Phone {
       }
       return Some(Action::TimedStatusLine("invalid response args. response save <payload-file-name>".into(), 3));
     }
+    if let Some(expr) = command_args.strip_prefix("jq ") {
+      return Some(Action::ApplyJqQuery(expr.trim().to_string()));
+    }
+    if command_args.eq("jq") {
+      return Some(Action::ApplyJqQuery(String::new()));
+    }
+    if let Some(term) = command_args.strip_prefix("search ") {
+      return Some(Action::ApplySearch(term.trim().to_string()));
+    }
+    if command_args.eq("search") {
+      return Some(Action::ApplySearch(String::new()));
+    }
     Some(Action::TimedStatusLine(
-      "unknown command. available commands are: send, query, header, request, response".into(),
+      "unknown command. available commands are: send, query, header, request, response, jq, search".into(),
       3,
     ))
   }
@@ -238,11 +250,12 @@ impl Page for Phone {
           pane.update(Action::Focus, state)?;
         }
         if let Some(action) = self.handle_commands(args) {
-          for pane in self.panes.iter_mut() {
-            actions.push(pane.update(action.clone(), state)?);
-          }
           if let Action::TimedStatusLine(_, _) = action {
-            actions.push(Some(action))
+            actions.push(Some(action));
+          } else {
+            for pane in self.panes.iter_mut() {
+              actions.push(pane.update(action.clone(), state)?);
+            }
           }
         }
       },

@@ -2,15 +2,37 @@ use std::{io::Write, sync::Arc};
 
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
+use jaq_core::{
+  load::{Arena, File, Loader},
+  Compiler, Ctx, RcIter,
+};
+use jaq_json::Val;
 use ratatui::{prelude::*, widgets::*};
+use syntect::{
+  easy::HighlightLines,
+  highlighting::{FontStyle as SyntectFontStyle, ThemeSet},
+  parsing::SyntaxSet,
+  util::LinesWithEndings,
+};
 
 use crate::{
   action::Action,
+  formatters::{json::JsonFormatter, FormatterRegistry},
   pages::phone::{RequestBuilder, RequestPane},
   panes::Pane,
-  state::{InputMode, OperationItem, State},
+  state::{OperationItem, State},
   tui::{EventResponse, Frame},
 };
+
+const SYNTAX_THEME: &str = "Solarized (dark)";
+
+#[derive(Default, PartialEq)]
+enum ViewerMode {
+  #[default]
+  Normal,
+  Search(Vec<usize>, usize), // (match byte offsets in formatted body, current index)
+  Jq(String, bool),          // (result text, is_error)
+}
 
 pub struct ResponseViewer {
   focused: bool,
@@ -18,11 +40,32 @@ pub struct ResponseViewer {
   operation_item: Arc<OperationItem>,
   content_types: Vec<String>,
   content_type_index: usize,
+  formatter_registry: FormatterRegistry,
+  mode: ViewerMode,
+  scroll_offset: usize,
+  // syntax highlighting cache: (formatted body text) -> highlighted lines
+  highlight_cache: Option<(String, Vec<Line<'static>>)>,
+  highlighter_syntax_set: SyntaxSet,
+  highlighter_theme_set: ThemeSet,
 }
 
 impl ResponseViewer {
   pub fn new(operation_item: Arc<OperationItem>, focused: bool, focused_border_style: Style) -> Self {
-    Self { operation_item, focused, focused_border_style, content_types: vec![], content_type_index: 0 }
+    let mut formatter_registry = FormatterRegistry::new();
+    formatter_registry.register(Box::new(JsonFormatter));
+    Self {
+      operation_item,
+      focused,
+      focused_border_style,
+      content_types: vec![],
+      content_type_index: 0,
+      formatter_registry,
+      mode: ViewerMode::Normal,
+      scroll_offset: 0,
+      highlight_cache: None,
+      highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
+      highlighter_theme_set: ThemeSet::load_defaults(),
+    }
   }
 
   fn border_style(&self) -> Style {
@@ -37,6 +80,135 @@ impl ResponseViewer {
       true => BorderType::Thick,
       false => BorderType::Plain,
     }
+  }
+
+  fn line_number_span(n: usize, width: usize) -> Span<'static> {
+    Span::styled(format!(" {n:>width$} "), Style::default().dim())
+  }
+
+  fn build_highlight(
+    body: &str,
+    syntax_name: &str,
+    syntax_set: &SyntaxSet,
+    theme_set: &ThemeSet,
+  ) -> Vec<Line<'static>> {
+    let Some(syntax) = syntax_set.find_syntax_by_extension(syntax_name) else {
+      return vec![Line::raw(body.to_string())];
+    };
+    let total = LinesWithEndings::from(body).count();
+    let width = total.to_string().len();
+    let mut highlighter = HighlightLines::new(syntax, &theme_set.themes[SYNTAX_THEME]);
+    LinesWithEndings::from(body)
+      .enumerate()
+      .filter_map(|(i, line)| highlighter.highlight_line(line, syntax_set).ok().map(|s| (i, s)))
+      .map(|(i, segments)| {
+        let mut spans = vec![Self::line_number_span(i + 1, width)];
+        spans.extend(segments.into_iter().map(|(style, text)| {
+          let fg = match style.foreground {
+            syntect::highlighting::Color { r, g, b, a } if a > 0 => Some(Color::Rgb(r, g, b)),
+            _ => None,
+          };
+          let fs = style.font_style;
+          let mut modifier = Modifier::empty();
+          if fs.contains(SyntectFontStyle::BOLD) {
+            modifier |= Modifier::BOLD;
+          }
+          if fs.contains(SyntectFontStyle::ITALIC) {
+            modifier |= Modifier::ITALIC;
+          }
+          if fs.contains(SyntectFontStyle::UNDERLINE) {
+            modifier |= Modifier::UNDERLINED;
+          }
+          let mut ratatui_style =
+            Style::default().add_modifier(modifier).underline_color(Color::Reset).bg(Color::Reset);
+          if let Some(fg) = fg {
+            ratatui_style = ratatui_style.fg(fg);
+          }
+          Span::styled(text.to_string(), ratatui_style)
+        }));
+        Line::from(spans)
+      })
+      .collect()
+  }
+
+  fn plain_with_line_numbers(text: &str) -> Text<'static> {
+    let total = text.lines().count();
+    let width = total.to_string().len();
+    Text::from(
+      text
+        .lines()
+        .enumerate()
+        .map(|(i, line)| Line::from(vec![Self::line_number_span(i + 1, width), Span::raw(line.to_string())]))
+        .collect::<Vec<_>>(),
+    )
+  }
+
+  /// Returns highlighted lines, reusing the cache if the body text hasn't changed.
+  fn highlighted_lines(&mut self, body: &str, syntax_name: &str) -> &[Line<'static>] {
+    let needs_rebuild = self.highlight_cache.as_ref().map(|(k, _)| k.as_str()) != Some(body);
+    if needs_rebuild {
+      let lines = Self::build_highlight(body, syntax_name, &self.highlighter_syntax_set, &self.highlighter_theme_set);
+      self.highlight_cache = Some((body.to_string(), lines));
+    }
+    &self.highlight_cache.as_ref().unwrap().1
+  }
+
+  fn run_search(term: &str, body: &str) -> Vec<usize> {
+    if term.is_empty() {
+      return vec![];
+    }
+    let lower_body = body.to_lowercase();
+    let lower_term = term.to_lowercase();
+    lower_body.match_indices(lower_term.as_str()).map(|(idx, _)| idx).collect()
+  }
+
+  fn run_jq(filter_str: &str, body: &str) -> (String, bool) {
+    let input_val: Val = match serde_json::from_str::<serde_json::Value>(body) {
+      Ok(v) => Val::from(v),
+      Err(e) => return (format!("JSON parse error: {e}"), true),
+    };
+
+    let program = File { code: filter_str, path: () };
+    let loader = Loader::new(jaq_std::defs().chain(jaq_json::defs()));
+    let arena = Arena::default();
+
+    let modules = match loader.load(&arena, program) {
+      Ok(m) => m,
+      Err(e) => return (format!("Parse error: {e:?}"), true),
+    };
+
+    let filter = match Compiler::default().with_funs(jaq_std::funs().chain(jaq_json::funs())).compile(modules) {
+      Ok(f) => f,
+      Err(e) => return (format!("Compile error: {e:?}"), true),
+    };
+
+    let inputs = RcIter::new(core::iter::empty());
+    let mut parts = Vec::new();
+    let mut has_error = false;
+
+    for output in filter.run((Ctx::new([], &inputs), input_val)) {
+      match output {
+        Ok(val) => match serde_json::to_string_pretty(&serde_json::Value::from(val)) {
+          Ok(s) => parts.push(s),
+          Err(e) => {
+            parts.push(format!("Serialization error: {e}"));
+            has_error = true;
+          },
+        },
+        Err(e) => {
+          parts.push(format!("Error: {e:?}"));
+          has_error = true;
+        },
+      }
+    }
+
+    (parts.join("\n"), has_error)
+  }
+
+  fn context_line(body: &str, byte_offset: usize) -> &str {
+    let before = body[..byte_offset].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let after = body[byte_offset..].find('\n').map(|i| byte_offset + i).unwrap_or(body.len());
+    &body[before..after]
   }
 }
 
@@ -75,18 +247,33 @@ impl Pane for ResponseViewer {
     }
   }
 
-  fn handle_key_events(&mut self, _key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
-    match state.input_mode {
-      InputMode::Normal => Ok(None),
-      InputMode::Insert => Ok(None),
-      InputMode::Command => Ok(None),
-    }
+  fn handle_key_events(&mut self, _key: KeyEvent, _state: &mut State) -> Result<Option<EventResponse<Action>>> {
+    Ok(None)
   }
 
   fn update(&mut self, action: Action, state: &mut State) -> Result<Option<Action>> {
     match action {
       Action::Update => {},
       Action::Submit => return Ok(Some(Action::Dial)),
+      Action::Down if self.focused => match &mut self.mode {
+        ViewerMode::Normal | ViewerMode::Jq(_, _) => {
+          self.scroll_offset = self.scroll_offset.saturating_add(1);
+        },
+        ViewerMode::Search(matches, current) if !matches.is_empty() => {
+          *current = (*current + 1) % matches.len();
+        },
+        _ => {},
+      },
+      Action::Up if self.focused => match &mut self.mode {
+        ViewerMode::Normal | ViewerMode::Jq(_, _) => {
+          self.scroll_offset = self.scroll_offset.saturating_sub(1);
+        },
+        ViewerMode::Search(matches, current) if !matches.is_empty() => {
+          let len = matches.len();
+          *current = if *current == 0 { len - 1 } else { *current - 1 };
+        },
+        _ => {},
+      },
       Action::Tab(index) if !self.content_types.is_empty() && index < self.content_types.len().try_into()? => {
         self.content_type_index = index.try_into()?;
       },
@@ -104,6 +291,50 @@ impl Pane for ResponseViewer {
       },
       Action::UnFocus => {
         self.focused = false;
+        self.mode = ViewerMode::Normal;
+        self.scroll_offset = 0;
+      },
+      Action::ApplySearch(term) => {
+        let formatted_body = self
+          .operation_item
+          .operation
+          .operation_id
+          .as_ref()
+          .and_then(|id| state.responses.get(id))
+          .map(|r| {
+            let ct = r.headers.get("content-type").and_then(|v| v.to_str().ok()).unwrap_or_default();
+            self.formatter_registry.format(ct, &r.body)
+          })
+          .unwrap_or_default();
+        self.scroll_offset = 0;
+        if term.is_empty() {
+          self.mode = ViewerMode::Normal;
+        } else {
+          let matches = Self::run_search(&term, &formatted_body);
+          let count = matches.len();
+          self.mode = ViewerMode::Search(matches, 0);
+          if count == 0 {
+            return Ok(Some(Action::TimedStatusLine(format!("no matches for '{term}'"), 3)));
+          }
+          return Ok(Some(Action::TimedStatusLine(format!("{count} match(es) for '{term}'"), 3)));
+        }
+      },
+      Action::ApplyJqQuery(filter) => {
+        self.scroll_offset = 0;
+        if filter.is_empty() {
+          self.mode = ViewerMode::Normal;
+        } else {
+          let body = self
+            .operation_item
+            .operation
+            .operation_id
+            .as_ref()
+            .and_then(|id| state.responses.get(id))
+            .map(|r| r.body.clone())
+            .unwrap_or_default();
+          let (result, is_error) = Self::run_jq(&filter, &body);
+          self.mode = ViewerMode::Jq(result, is_error);
+        }
       },
       Action::SaveResponsePayload(filepath) => {
         if let Some(response) =
@@ -139,12 +370,75 @@ impl Pane for ResponseViewer {
         symbols::DOT,
         humansize::format_size(response.content_length.unwrap_or(response.body.len() as u64), humansize::DECIMAL)
       );
-      frame.render_widget(
-        Paragraph::new(response.body.clone()).wrap(Wrap { trim: false }).block(
-          Block::default().borders(Borders::RIGHT).border_style(self.border_style()).border_type(self.border_type()),
-        ),
-        inner_panes[0],
-      );
+
+      let content_type =
+        response.headers.get("content-type").and_then(|v| v.to_str().ok()).unwrap_or_default().to_string();
+
+      let body_block =
+        Block::default().borders(Borders::RIGHT).border_style(self.border_style()).border_type(self.border_type());
+
+      match &self.mode {
+        ViewerMode::Normal => {
+          let formatted_body = self.formatter_registry.format(&content_type, &response.body);
+          let syntax = self.formatter_registry.syntax_name(&content_type);
+
+          if let Some(syntax_name) = syntax {
+            let lines = self.highlighted_lines(&formatted_body, syntax_name);
+            let text = Text::from(lines.to_vec());
+            frame.render_widget(
+              Paragraph::new(text).scroll((self.scroll_offset as u16, 0)).block(body_block),
+              inner_panes[0],
+            );
+          } else {
+            frame.render_widget(
+              Paragraph::new(Self::plain_with_line_numbers(&formatted_body))
+                .scroll((self.scroll_offset as u16, 0))
+                .block(body_block),
+              inner_panes[0],
+            );
+          }
+        },
+        ViewerMode::Search(matches, current) => {
+          let current = *current;
+          let formatted_body = self.formatter_registry.format(&content_type, &response.body);
+          let match_lines: Vec<Line<'_>> = matches
+            .iter()
+            .enumerate()
+            .map(|(i, &offset)| {
+              let ctx = Self::context_line(&formatted_body, offset);
+              let style = if i == current {
+                Style::default().add_modifier(Modifier::BOLD).fg(Color::LightYellow)
+              } else {
+                Style::default()
+              };
+              Line::styled(format!(" {ctx}"), style)
+            })
+            .collect();
+
+          let count_str = format!(" {}/{}", current + 1, matches.len());
+          let mut list_state =
+            ListState::default().with_selected(if matches.is_empty() { None } else { Some(current) });
+          frame.render_stateful_widget(
+            List::new(match_lines)
+              .highlight_symbol(symbols::scrollbar::HORIZONTAL.end)
+              .highlight_spacing(HighlightSpacing::Always)
+              .block(body_block.title_bottom(Line::from(count_str).right_aligned())),
+            inner_panes[0],
+            &mut list_state,
+          );
+        },
+        ViewerMode::Jq(result, is_error) => {
+          let style = if *is_error { Style::default().fg(Color::LightRed) } else { Style::default() };
+          frame.render_widget(
+            Paragraph::new(Self::plain_with_line_numbers(result))
+              .style(style)
+              .scroll((self.scroll_offset as u16, 0))
+              .block(body_block),
+            inner_panes[0],
+          );
+        },
+      }
+
       frame.render_widget(
         List::new(
           response
@@ -179,13 +473,19 @@ impl Pane for ResponseViewer {
       String::default()
     };
 
+    let mode_hint = match &self.mode {
+      ViewerMode::Normal => String::new(),
+      ViewerMode::Search(_, _) => " [j/k navigate · :search to clear]".to_string(),
+      ViewerMode::Jq(_, _) => " [j/k scroll · :jq to clear]".to_string(),
+    };
+
     frame.render_widget(
       Block::default()
         .title(format!("Response{content_types}"))
         .borders(Borders::ALL)
         .border_style(self.border_style())
         .border_type(self.border_type())
-        .title_bottom(Line::from(status_line).right_aligned()),
+        .title_bottom(Line::from(format!("{status_line}{mode_hint}")).right_aligned()),
       area,
     );
 

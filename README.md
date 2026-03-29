@@ -170,7 +170,11 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `query`, `q` | Add or remove query strings. sub-commands are `add` or `rm`. e.g. `query add page` |
 | `header`, `h` | Add or remove headers. sub-commands are `add` or `rm`. e.g. `header add x-api-key` |
 | `request`, `r` | Load request payload. e.g. `request open /home/hamed/payload.json` |
-| `response`, `s` | Save response payload e.g/ `response save /home/hamed/result.json` |
+| `response`, `s` | Save response payload e.g. `response save /home/hamed/result.json` |
+| `jq <expr>` | Filter JSON response with a jq expression. e.g. `jq .items[0]` |
+| `jq` | Clear jq filter and return to normal response view |
+| `search <term>` | Search for a term in the response body (case-insensitive). e.g. `search error` |
+| `search` | Clear search and return to normal response view |
 
 # Environment Variables
 | Variable | Description |
@@ -204,6 +208,12 @@ Then, add `openapi-tui` to your `configuration.nix`
 - [X] Support array query strings
 - [X] Suppert extra headers
 - [X] Support multiple servers
+- [X] Format response body by content-type (JSON pretty-print)
+- [X] Syntax highlighting in response viewer
+- [X] Line numbers in response viewer
+- [X] Scroll response body with j/k
+- [X] JQ filter for JSON responses
+- [X] Text search in response body
 
 # Backlog
 - [ ] Schema Types (openapi-31)
