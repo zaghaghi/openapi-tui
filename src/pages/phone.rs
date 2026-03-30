@@ -34,7 +34,7 @@ pub trait RequestBuilder {
     url
   }
 
-  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+  fn request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     request
   }
 }
@@ -68,7 +68,7 @@ impl Phone {
     let request_builder = self
       .panes
       .iter()
-      .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.reqeust(request_builder));
+      .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.request(request_builder));
 
     Ok(request_builder.build()?)
   }
