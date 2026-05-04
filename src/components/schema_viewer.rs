@@ -41,15 +41,38 @@ fn resolve_walk(
   value: &serde_json::Value,
   _parent_path: &str,
   indent: usize,
-  _components: &HashMap<String, serde_json::Value>,
+  components: &HashMap<String, serde_json::Value>,
   _variant_selection: &HashMap<NodeId, usize>,
-  _expanding: &mut HashSet<String>,
+  expanding: &mut HashSet<String>,
 ) -> Vec<RenderBlock> {
+  if let Some(name) = ref_target_name(value) {
+    if let Some(target) = components.get(name) {
+      expanding.insert(name.to_string());
+      let blocks = resolve_walk(target, _parent_path, indent, components, _variant_selection, expanding);
+      expanding.remove(name);
+      return blocks;
+    }
+    // Unknown component: fall through and emit the literal $ref.
+  }
+
   let yaml = match serde_yaml::to_string(value) {
     Ok(s) => s,
     Err(_) => return Vec::new(),
   };
   vec![RenderBlock::Yaml(indent_lines(&yaml, indent))]
+}
+
+/// Returns the bare component name if `value` is exactly `{"$ref":
+/// "#/components/schemas/<name>"}`, else None. We deliberately reject other
+/// `$ref` shapes (parameters, responses, external) — those stay literal.
+#[allow(dead_code)]
+fn ref_target_name(value: &serde_json::Value) -> Option<&str> {
+  let obj = value.as_object()?;
+  if obj.len() != 1 {
+    return None;
+  }
+  let s = obj.get("$ref")?.as_str()?;
+  s.strip_prefix("#/components/schemas/")
 }
 
 /// Prepend `n` spaces to each non-empty line.
@@ -267,6 +290,24 @@ mod tests {
         assert!(s.contains("type: object"), "yaml block did not contain 'type: object': {s}")
       },
       other => panic!("expected Yaml block, got {other:?}"),
+    }
+  }
+
+  #[test]
+  fn ref_to_component_resolves_inline() {
+    let mut components = HashMap::new();
+    components.insert("Foo".to_string(), json!({ "type": "object", "x-custom": "marker" }));
+
+    let blocks = walk(json!({ "$ref": "#/components/schemas/Foo" }), components);
+
+    assert_eq!(blocks.len(), 1);
+    match &blocks[0] {
+      RenderBlock::Yaml(s) => {
+        assert!(s.contains("type: object"));
+        assert!(s.contains("x-custom: marker"));
+        assert!(!s.contains("$ref"), "resolved output should not contain $ref");
+      },
+      other => panic!("expected Yaml, got {other:?}"),
     }
   }
 }
