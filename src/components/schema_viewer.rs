@@ -427,6 +427,7 @@ pub struct SchemaViewer {
 
   variant_selection: HashMap<NodeId, usize>,
   variant_scopes: Vec<VariantScope>,
+  cached_blocks: Vec<RenderBlock>,
 
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
@@ -442,6 +443,7 @@ impl Default for SchemaViewer {
       line_offset_history: Vec::default(),
       variant_selection: HashMap::default(),
       variant_scopes: Vec::default(),
+      cached_blocks: Vec::default(),
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
     }
@@ -465,6 +467,7 @@ impl SchemaViewer {
     self.styles = vec![];
     self.variant_selection.clear();
     self.variant_scopes.clear();
+    self.cached_blocks.clear();
   }
 
   pub fn set(&mut self, schema: serde_json::Value) -> Result<()> {
@@ -602,9 +605,12 @@ impl SchemaViewer {
     self.variant_scopes = vec![];
 
     let mut expanding = HashSet::new();
-    let blocks = resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding);
+    self.cached_blocks = resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding);
 
-    self.render_blocks(&blocks)?;
+    let blocks = std::mem::take(&mut self.cached_blocks);
+    let result = self.render_blocks(&blocks);
+    self.cached_blocks = blocks;
+    result?;
     Ok(())
   }
 
