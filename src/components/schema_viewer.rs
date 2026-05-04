@@ -39,13 +39,13 @@ pub struct VariantScope {
 #[allow(dead_code)]
 fn resolve_walk(
   value: &serde_json::Value,
-  _parent_path: &str,
+  parent_path: &str,
   indent: usize,
   components: &HashMap<String, serde_json::Value>,
-  _variant_selection: &HashMap<NodeId, usize>,
+  variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
 ) -> Vec<RenderBlock> {
-  let node = to_node(value, components, expanding);
+  let node = to_node(value, parent_path, components, variant_selection, expanding);
   let mut blocks = Vec::new();
   let mut buf = String::new();
   emit_node(&node, indent, &mut blocks, &mut buf);
@@ -92,12 +92,12 @@ enum Node {
   },
 }
 
-/// Walks `value`, following refs and producing a `Node` tree. Composition
-/// (`allOf` / `anyOf` / `oneOf`) is handled in later tasks; for now a
-/// composition keyword is treated as an ordinary object key.
+/// Walks `value`, following refs and producing a `Node` tree.
 fn to_node(
   value: &serde_json::Value,
+  parent_path: &str,
   components: &HashMap<String, serde_json::Value>,
+  variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
 ) -> Node {
   if let Some(name) = ref_target_name(value) {
@@ -106,7 +106,7 @@ fn to_node(
     }
     if let Some(target) = components.get(name) {
       expanding.insert(name.to_string());
-      let node = to_node(target, components, expanding);
+      let node = to_node(target, parent_path, components, variant_selection, expanding);
       expanding.remove(name);
       return node;
     }
@@ -114,32 +114,62 @@ fn to_node(
 
   if let Some(members) = all_of_members(value) {
     let sources = all_of_sources(members);
-    let merged = merge_all_of(members, components, expanding);
+    let merged = merge_all_of(members, parent_path, components, variant_selection, expanding);
     return Node::Composed { leading: Box::new(Node::Marker(format!("[All of: {sources}]"))), body: Box::new(merged) };
   }
 
   if let Some((kind, members)) = composition_members(value) {
-    // Path tracking is handled by the caller (see Task 7); for now use a
-    // synthetic id derived from the keyword + member count + first member's
-    // type. This is good enough for tests; the real id is set in Task 7.
-    let id = format!("__anonymous__/{kind}");
+    let id = format!("{parent_path}/{kind}");
     let choices = members.iter().enumerate().map(|(i, m)| variant_label(m, i)).collect::<Vec<_>>();
-    let selected = 0;
+    let max_index = choices.len().saturating_sub(1);
+    let selected = variant_selection.get(&id).copied().unwrap_or(0).min(max_index);
     let chosen = members.get(selected).cloned().unwrap_or(serde_json::Value::Null);
-    let body = to_node(&chosen, components, expanding);
+    let chosen_path = format!("{id}/{selected}");
+    let body = to_node(&chosen, &chosen_path, components, variant_selection, expanding);
 
-    return Node::Variants { id, choices, selected, body: Box::new(body) };
+    let variants_node = Node::Variants { id, choices, selected, body: Box::new(body) };
+
+    // Sibling keys (anything that is not the composition keyword itself).
+    let sibling_pairs: Vec<(String, Node)> = value
+      .as_object()
+      .map(|m| {
+        m.iter()
+          .filter(|(k, _)| k.as_str() != kind && k.as_str() != "allOf")
+          .map(|(k, v)| {
+            let child_path = format!("{parent_path}/{k}");
+            (k.clone(), to_node(v, &child_path, components, variant_selection, expanding))
+          })
+          .collect()
+      })
+      .unwrap_or_default();
+
+    if sibling_pairs.is_empty() {
+      return variants_node;
+    }
+    return Node::Composed { leading: Box::new(variants_node), body: Box::new(Node::Object(sibling_pairs)) };
   }
 
   match value {
     serde_json::Value::Object(map) => {
       let mut pairs = Vec::with_capacity(map.len());
       for (k, v) in map {
-        pairs.push((k.clone(), to_node(v, components, expanding)));
+        let child_path = format!("{parent_path}/{k}");
+        pairs.push((k.clone(), to_node(v, &child_path, components, variant_selection, expanding)));
       }
       Node::Object(pairs)
     },
-    serde_json::Value::Array(items) => Node::Array(items.iter().map(|v| to_node(v, components, expanding)).collect()),
+    serde_json::Value::Array(items) => {
+      Node::Array(
+        items
+          .iter()
+          .enumerate()
+          .map(|(i, v)| {
+            let child_path = format!("{parent_path}/{i}");
+            to_node(v, &child_path, components, variant_selection, expanding)
+          })
+          .collect(),
+      )
+    },
     _ => Node::Scalar(value.clone()),
   }
 }
@@ -163,13 +193,16 @@ fn all_of_sources(members: &[serde_json::Value]) -> String {
 
 fn merge_all_of(
   members: &[serde_json::Value],
+  parent_path: &str,
   components: &HashMap<String, serde_json::Value>,
+  variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
 ) -> Node {
   let mut acc: Vec<(String, Node)> = Vec::new();
   let mut seen_keys: HashMap<String, usize> = HashMap::new();
-  for member in members {
-    let resolved = to_node(member, components, expanding);
+  for (i, member) in members.iter().enumerate() {
+    let member_path = format!("{parent_path}/allOf/{i}");
+    let resolved = to_node(member, &member_path, components, variant_selection, expanding);
     if let Node::Object(pairs) = resolved {
       for (k, v) in pairs {
         if k == "allOf" {
@@ -315,11 +348,11 @@ fn flush_yaml(indent: usize, buf: &mut String, out: &mut Vec<RenderBlock>) {
 fn contains_marker(node: &Node) -> bool {
   match node {
     Node::Marker(_) => true,
+    Node::Variants { .. } => true,
     Node::Scalar(_) => false,
     Node::Array(items) => items.iter().any(contains_marker),
     Node::Object(pairs) => pairs.iter().any(|(_, v)| contains_marker(v)),
     Node::Composed { leading, body } => contains_marker(leading) || contains_marker(body),
-    Node::Variants { body, .. } => contains_marker(body),
   }
 }
 
@@ -696,5 +729,99 @@ mod tests {
       .collect();
     assert!(after_yaml.contains("name:"), "merged yaml missing 'name': {after_yaml}");
     assert!(after_yaml.contains("bark:"), "merged yaml missing 'bark': {after_yaml}");
+  }
+
+  #[test]
+  fn any_of_with_sibling_keys_preserves_them() {
+    let value = json!({
+      "anyOf": [{ "type": "object", "title": "X" }],
+      "description": "hello",
+      "nullable": true,
+    });
+
+    let blocks = walk(value, HashMap::new());
+
+    let mut saw_variants = false;
+    let mut saw_sibling_yaml = false;
+    for b in &blocks {
+      match b {
+        RenderBlock::Variants { .. } => saw_variants = true,
+        RenderBlock::Yaml(s) if s.contains("description: hello") && s.contains("nullable: true") => {
+          saw_sibling_yaml = true;
+        },
+        _ => {},
+      }
+    }
+    assert!(saw_variants, "expected a Variants block");
+    assert!(saw_sibling_yaml, "expected a Yaml block with sibling keys: {blocks:#?}");
+  }
+
+  #[test]
+  fn variants_have_pointer_path_ids() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "field": {
+          "anyOf": [{ "type": "string" }, { "type": "integer" }]
+        }
+      }
+    });
+
+    let blocks = walk(value, HashMap::new());
+
+    // Find the Variants block by recursing into the IR.
+    fn find_variants(blocks: &[RenderBlock]) -> Option<&RenderBlock> {
+      for b in blocks {
+        if let RenderBlock::Variants { body_blocks, .. } = b {
+          return Some(b).or_else(|| find_variants(body_blocks));
+        }
+      }
+      None
+    }
+    let v = find_variants(&blocks).expect("expected Variants somewhere");
+    match v {
+      RenderBlock::Variants { id, .. } => {
+        assert_eq!(id, "/properties/field/anyOf");
+      },
+      _ => unreachable!(),
+    }
+  }
+
+  #[test]
+  fn variant_selection_is_honored() {
+    let value = json!({
+      "anyOf": [
+        { "type": "object", "x-tag": "first" },
+        { "type": "object", "x-tag": "second" }
+      ]
+    });
+
+    let mut selection = HashMap::new();
+    selection.insert("/anyOf".to_string(), 1);
+
+    let mut expanding = HashSet::new();
+    let blocks = resolve_walk(&value, "", 0, &HashMap::new(), &selection, &mut expanding);
+
+    let v = blocks
+      .iter()
+      .find_map(|b| {
+        match b {
+          RenderBlock::Variants { selected, body_blocks, .. } => Some((*selected, body_blocks)),
+          _ => None,
+        }
+      })
+      .expect("expected Variants");
+    assert_eq!(v.0, 1);
+    let body_yaml: String = v
+      .1
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(body_yaml.contains("x-tag: second"), "expected second variant in body: {body_yaml}");
   }
 }
