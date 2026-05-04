@@ -198,31 +198,55 @@ fn merge_all_of(
 ) -> Node {
   let mut acc: Vec<(String, Node)> = Vec::new();
   let mut seen_keys: HashMap<String, usize> = HashMap::new();
+  let mut markers: Vec<Node> = Vec::new();
+
   for (i, member) in members.iter().enumerate() {
     let member_path = format!("{parent_path}/allOf/{i}");
     let resolved = to_node(member, &member_path, components, variant_selection, expanding);
-    if let Node::Object(pairs) = resolved {
-      for (k, v) in pairs {
-        if k == "allOf" {
-          continue; // already merged
-        }
-        if let Some(&idx) = seen_keys.get(&k) {
-          // Deep-merge two Object children (keeps properties/etc. from
-          // earlier members instead of clobbering them); later wins on
-          // scalars; arrays concat with simple dedupe.
-          let prev = std::mem::replace(&mut acc[idx].1, Node::Scalar(serde_json::Value::Null));
-          acc[idx].1 = merge_nodes(prev, v);
-        } else {
-          seen_keys.insert(k.clone(), acc.len());
-          acc.push((k, v));
-        }
+
+    // Walk through any nested Composed wrappers so members that resolve to
+    // `Composed { Marker, Object }` (allOf-of-allOf via $ref) contribute
+    // their underlying pairs to the merge instead of being silently dropped.
+    let mut node = resolved;
+    let pairs = loop {
+      match node {
+        Node::Object(pairs) => break Some(pairs),
+        Node::Composed { leading, body } => {
+          if let Node::Marker(t) = *leading {
+            markers.push(Node::Marker(t));
+          }
+          node = *body;
+        },
+        Node::Marker(t) => {
+          markers.push(Node::Marker(t));
+          break None;
+        },
+        // Scalars/arrays/Variants at allOf member top level are not
+        // meaningful for object merging — drop silently.
+        _ => break None,
       }
-    } else if let Node::Marker(t) = resolved {
-      acc.push((format!("__marker_{}", acc.len()), Node::Marker(t)));
+    };
+
+    let Some(pairs) = pairs else { continue };
+    for (k, v) in pairs {
+      if k == "allOf" {
+        continue;
+      }
+      if let Some(&idx) = seen_keys.get(&k) {
+        let prev = std::mem::replace(&mut acc[idx].1, Node::Scalar(serde_json::Value::Null));
+        acc[idx].1 = merge_nodes(prev, v);
+      } else {
+        seen_keys.insert(k.clone(), acc.len());
+        acc.push((k, v));
+      }
     }
-    // Scalars/arrays at allOf member top level are not meaningful; ignore.
   }
-  Node::Object(acc)
+
+  let body = Node::Object(acc);
+  // Prepend collected markers (e.g. from recursive sub-refs) so the outer
+  // view shows them above the merged content rather than smuggling them
+  // into the object's key namespace under synthetic keys.
+  markers.into_iter().rev().fold(body, |acc, marker| Node::Composed { leading: Box::new(marker), body: Box::new(acc) })
 }
 
 /// Deep-merge two Nodes. Object + Object recurses by key. Array + Array
@@ -483,6 +507,15 @@ impl SchemaViewer {
   }
 
   pub fn back(&mut self, schema: serde_json::Value) -> Result<()> {
+    // With $refs auto-resolved inline, the rendered output never contains
+    // literal $ref lines for `go()` to land on, so name_history /
+    // line_offset_history stay empty in practice. In that case treat
+    // `back` as a no-op rather than calling `set()`, which would clear
+    // variant_selection and lose the user's anyOf/oneOf choices.
+    if self.line_offset_history.is_empty() && self.name_history.is_empty() {
+      return Ok(());
+    }
+
     if let Some(line_offset) = self.line_offset_history.pop() {
       self.line_offset = line_offset;
     } else {
@@ -540,6 +573,10 @@ impl SchemaViewer {
     self.variant_selection.insert(scope.id, next);
 
     self.set_styles(schema.clone())?;
+    // The new selected variant may have a shorter body than the previous
+    // one; clamp the cursor so it stays inside the new line range and the
+    // user can keep pressing `,` / `.` without first scrolling.
+    self.line_offset = self.line_offset.min(self.styles.len().saturating_sub(1));
     Ok(())
   }
 
@@ -959,6 +996,81 @@ mod tests {
     }
     assert!(walked > 0);
     eprintln!("[smoke] walked {walked} schemas from {path} without panic");
+  }
+
+  #[test]
+  fn all_of_with_self_referential_member_does_not_emit_synthetic_key() {
+    // Regression: previously `merge_all_of` smuggled Markers from
+    // recursive members into the merged Object as `__marker_N` keys,
+    // which leaked into the rendered YAML as literal `__marker_0:` lines.
+    let mut components = HashMap::new();
+    components.insert(
+      "Self".to_string(),
+      json!({
+        "allOf": [
+          { "$ref": "#/components/schemas/Self" },
+          { "type": "object", "properties": { "name": { "type": "string" } } }
+        ]
+      }),
+    );
+
+    let blocks = walk(json!({ "$ref": "#/components/schemas/Self" }), components);
+
+    let yaml: String = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    assert!(!yaml.contains("__marker_"), "synthetic __marker_N key leaked into rendered yaml:\n{yaml}");
+
+    // The recursion marker should still be present (just not attached to
+    // a fake key).
+    let has_recursive_marker =
+      blocks.iter().any(|b| matches!(b, RenderBlock::Marker { text, .. } if text == "[Recursive Self]"));
+    assert!(has_recursive_marker, "expected [Recursive Self] marker in blocks: {blocks:#?}");
+  }
+
+  #[test]
+  fn all_of_member_that_resolves_to_another_all_of_is_merged() {
+    // Regression: previously a `Composed { Marker, Object }` member
+    // (i.e. an allOf member whose $ref target is itself an allOf schema)
+    // was silently dropped from the merge. The fix walks Composed
+    // wrappers down to the underlying Object.
+    let mut components = HashMap::new();
+    components.insert(
+      "Inner".to_string(),
+      json!({
+        "allOf": [
+          { "type": "object", "properties": { "inner_field": { "type": "string" } } }
+        ]
+      }),
+    );
+
+    let value = json!({
+      "allOf": [
+        { "$ref": "#/components/schemas/Inner" },
+        { "type": "object", "properties": { "outer_field": { "type": "integer" } } }
+      ]
+    });
+
+    let blocks = walk(value, components);
+    let yaml: String = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    assert!(yaml.contains("inner_field"), "inner_field from nested allOf was dropped:\n{yaml}");
+    assert!(yaml.contains("outer_field"), "outer_field from outer allOf is missing:\n{yaml}");
   }
 
   #[test]
