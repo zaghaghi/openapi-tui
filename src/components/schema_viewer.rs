@@ -44,6 +44,51 @@ pub struct VariantScope {
   pub choice_count: usize,
 }
 
+/// Per-token-role styles for annotated-view rendering, resolved from the
+/// active syntect theme. Built once per `set_styles` call.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct Palette {
+  field_name: Style,
+  optional: Style,
+  type_paren: Style,
+  type_name: Style,
+  array_brackets: Style,
+  colon: Style,
+  string_value: Style,
+  numeric_value: Style,
+  boolean_value: Style,
+  enum_pipe: Style,
+  description: Style,
+}
+
+#[allow(dead_code)]
+impl Palette {
+  fn from_theme(theme: &syntect::highlighting::Theme) -> Self {
+    use syntect::{highlighting::Highlighter, parsing::Scope};
+    let highlighter = Highlighter::new(theme);
+    let resolve = |scope_str: &str| -> Style {
+      let scope = Scope::new(scope_str).expect("hardcoded scope literal must parse");
+      let synstyle = highlighter.style_for_stack(&[scope]);
+      syntect_style_to_ratatui(synstyle)
+    };
+
+    Palette {
+      field_name: resolve("entity.name.tag.yaml"),
+      optional: resolve("keyword.operator"),
+      type_paren: resolve("punctuation.definition.parameters"),
+      type_name: resolve("entity.name.type"),
+      array_brackets: resolve("punctuation.section.brackets"),
+      colon: resolve("punctuation.separator.key-value"),
+      string_value: resolve("string.quoted.double"),
+      numeric_value: resolve("constant.numeric"),
+      boolean_value: resolve("constant.language"),
+      enum_pipe: resolve("keyword.operator"),
+      description: resolve("comment.line"),
+    }
+  }
+}
+
 /// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
 /// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
 /// components map and the user's per-strip selections explicitly.
@@ -712,6 +757,29 @@ fn indent_lines(s: &str, n: usize) -> String {
 
 const SYNTAX_THEME: &str = "Solarized (dark)";
 
+fn syntect_style_to_ratatui(s: syntect::highlighting::Style) -> Style {
+  let fg = match s.foreground {
+    syntect::highlighting::Color { r, g, b, a } if a > 0 => Some(Color::Rgb(r, g, b)),
+    _ => None,
+  };
+  let fs = s.font_style;
+  let mut modifier = Modifier::empty();
+  if fs.contains(SyntectFontStyle::BOLD) {
+    modifier |= Modifier::BOLD;
+  }
+  if fs.contains(SyntectFontStyle::ITALIC) {
+    modifier |= Modifier::ITALIC;
+  }
+  if fs.contains(SyntectFontStyle::UNDERLINE) {
+    modifier |= Modifier::UNDERLINED;
+  }
+  let mut style = Style::default().add_modifier(modifier);
+  if let Some(fg) = fg {
+    style = style.fg(fg);
+  }
+  style
+}
+
 pub struct SchemaViewer {
   components: HashMap<String, serde_json::Value>,
   styles: Vec<Vec<(Style, String)>>,
@@ -993,25 +1061,7 @@ impl SchemaViewer {
         .highlight_line(line, &self.highlighter_syntax_set)?
         .into_iter()
         .map(|segment| {
-          let fg = match segment.0.foreground {
-            syntect::highlighting::Color { r, g, b, a } if a > 0 => Some(Color::Rgb(r, g, b)),
-            _ => None,
-          };
-          let fs = segment.0.font_style;
-          let mut modifier = Modifier::empty();
-          if fs.contains(SyntectFontStyle::BOLD) {
-            modifier |= Modifier::BOLD;
-          }
-          if fs.contains(SyntectFontStyle::ITALIC) {
-            modifier |= Modifier::ITALIC;
-          }
-          if fs.contains(SyntectFontStyle::UNDERLINE) {
-            modifier |= Modifier::UNDERLINED;
-          }
-          let mut style = Style::default().add_modifier(modifier).underline_color(Color::Reset).bg(Color::Reset);
-          if let Some(fg) = fg {
-            style = style.fg(fg);
-          }
+          let style = syntect_style_to_ratatui(segment.0).underline_color(Color::Reset).bg(Color::Reset);
           (style, segment.1.to_string())
         })
         .collect();
