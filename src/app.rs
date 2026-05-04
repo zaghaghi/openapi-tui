@@ -218,16 +218,15 @@ impl App {
             }
             action_tx.send(Action::CloseHistory).unwrap();
           },
-          Action::HangUp(ref operation_id) => {
-            if self.pages.len() > 1 {
-              self.pages[0].unfocus()?;
-              let page = self.pages.remove(0);
-              self.pages[0].focus()?;
-              if let Some(operation_id) = operation_id {
-                self.history.insert(operation_id.clone(), page);
-              }
+          Action::HangUp(ref operation_id) if self.pages.len() > 1 => {
+            self.pages[0].unfocus()?;
+            let page = self.pages.remove(0);
+            self.pages[0].focus()?;
+            if let Some(operation_id) = operation_id {
+              self.history.insert(operation_id.clone(), page);
             }
           },
+          Action::HangUp(_) => {},
           Action::History => {
             let operation_ids = self
               .state
@@ -242,9 +241,7 @@ impl App {
             self.popup = Some(Box::new(history_popup));
           },
           Action::CloseHistory => {
-            if self.popup.is_some() {
-              self.popup = None;
-            }
+            self.popup = None;
           },
           _ => {},
         }
