@@ -687,8 +687,10 @@ fn type_hint_str(node: &Node) -> Option<String> {
   }
 
   if let Some(t) = type_str {
+    // When `format` is present, show only the format — `(date-time)` reads
+    // better than `(string · date-time)`, and the type is implied.
     if let Some(format) = node_get_scalar_str(map, "format") {
-      return Some(format!("{t} · {format}"));
+      return Some(format.to_string());
     }
     return Some(t);
   }
@@ -1763,10 +1765,7 @@ mod tests {
       })
       .collect();
 
-    assert!(
-      field_lines.iter().any(|l: &String| l == "id (integer · int64)?: 10"),
-      "id line missing/wrong: {field_lines:?}"
-    );
+    assert!(field_lines.iter().any(|l: &String| l == "id (int64)?: 10"), "id line missing/wrong: {field_lines:?}");
     assert!(
       field_lines.iter().any(|l| l == "name (string): \"doggie\"  # the pet's name"),
       "name line missing/wrong: {field_lines:?}"
@@ -2220,7 +2219,7 @@ mod tests {
 
     let line = first_annotated_field(&blocks, |t| t == "expire_time");
     let joined: String = line.iter().map(|(_, t)| t.as_str()).collect();
-    assert!(joined.contains("(string · date-time)"), "expected `(string · date-time)` hint: {joined}");
+    assert!(joined.contains("(date-time)"), "expected `(date-time)` hint: {joined}");
 
     let block = blocks
       .iter()
@@ -2240,10 +2239,11 @@ mod tests {
     }
   }
 
-  /// Format on string fields appears in the type hint (e.g.
-  /// `(string · date-time)`) so users see it without parking the cursor.
+  /// When `format` is present, the type hint shows the format alone
+  /// (e.g. `(date-time)`) — the type prefix is implied. Format also
+  /// stays in the detail line.
   #[test]
-  fn annotated_format_appears_in_type_hint() {
+  fn annotated_format_replaces_type_in_hint() {
     let value = json!({
       "type": "object",
       "properties": {
@@ -2253,6 +2253,7 @@ mod tests {
     let blocks = walk_annotated(value, HashMap::new());
     let line = first_annotated_field(&blocks, |t| t == "ts");
     let joined: String = line.iter().map(|(_, t)| t.as_str()).collect();
-    assert!(joined.contains("(string · date-time)"), "expected `(string · date-time)` hint: {joined}");
+    assert!(joined.contains("(date-time)"), "expected `(date-time)` hint: {joined}");
+    assert!(!joined.contains("string"), "type prefix should be dropped when format is present: {joined}");
   }
 }
