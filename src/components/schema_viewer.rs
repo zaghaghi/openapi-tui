@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+  collections::{HashMap, HashSet},
+  ops::Range,
+};
 
 use color_eyre::eyre::Result;
 use ratatui::{prelude::*, widgets::*};
@@ -10,6 +13,62 @@ use syntect::{
 };
 
 use crate::state::State;
+
+pub type NodeId = String;
+
+#[derive(Debug, Clone)]
+pub enum RenderBlock {
+  /// A chunk of YAML text already indented to its target column.
+  Yaml(String),
+  /// A bracketed annotation rendered with a fixed marker style.
+  Marker { indent: usize, text: String },
+  /// A tab strip plus the body of the currently-selected variant.
+  Variants { id: NodeId, indent: usize, choices: Vec<String>, selected: usize, body_blocks: Vec<RenderBlock> },
+}
+
+#[derive(Debug, Clone)]
+pub struct VariantScope {
+  pub line_range: Range<usize>,
+  pub id: NodeId,
+  pub choice_count: usize,
+}
+
+/// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
+/// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
+/// components map and the user's per-strip selections explicitly.
+#[allow(dead_code)]
+fn resolve_walk(
+  value: &serde_json::Value,
+  _parent_path: &str,
+  indent: usize,
+  _components: &HashMap<String, serde_json::Value>,
+  _variant_selection: &HashMap<NodeId, usize>,
+  _expanding: &mut HashSet<String>,
+) -> Vec<RenderBlock> {
+  let yaml = match serde_yaml::to_string(value) {
+    Ok(s) => s,
+    Err(_) => return Vec::new(),
+  };
+  vec![RenderBlock::Yaml(indent_lines(&yaml, indent))]
+}
+
+/// Prepend `n` spaces to each non-empty line.
+#[allow(dead_code)]
+fn indent_lines(s: &str, n: usize) -> String {
+  if n == 0 {
+    return s.to_string();
+  }
+  let pad = " ".repeat(n);
+  let mut out = String::with_capacity(s.len() + n * s.lines().count());
+  for line in s.lines() {
+    if !line.is_empty() {
+      out.push_str(&pad);
+    }
+    out.push_str(line);
+    out.push('\n');
+  }
+  out
+}
 
 const SYNTAX_THEME: &str = "Solarized (dark)";
 
@@ -183,6 +242,31 @@ impl SchemaViewer {
       self.set_styles(schema.clone())
     } else {
       Ok(())
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use serde_json::json;
+
+  use super::*;
+
+  fn walk(value: serde_json::Value, components: HashMap<String, serde_json::Value>) -> Vec<RenderBlock> {
+    let selection = HashMap::new();
+    let mut expanding = HashSet::new();
+    resolve_walk(&value, "", 0, &components, &selection, &mut expanding)
+  }
+
+  #[test]
+  fn plain_object_yields_single_yaml_block() {
+    let blocks = walk(json!({ "type": "object" }), HashMap::new());
+    assert_eq!(blocks.len(), 1, "expected exactly one block");
+    match &blocks[0] {
+      RenderBlock::Yaml(s) => {
+        assert!(s.contains("type: object"), "yaml block did not contain 'type: object': {s}")
+      },
+      other => panic!("expected Yaml block, got {other:?}"),
     }
   }
 }
