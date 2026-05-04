@@ -1437,9 +1437,45 @@ mod tests {
     assert!(yaml.contains("outer_field"), "outer_field from outer allOf is missing:\n{yaml}");
   }
 
+  fn smoke_test_spec_with_mode(path: &str, view_mode: ViewMode) {
+    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
+    let spec: serde_json::Value = if path.ends_with(".yml") || path.ends_with(".yaml") {
+      serde_yaml::from_str(&raw).unwrap_or_else(|e| panic!("failed to parse {path} as YAML: {e}"))
+    } else {
+      serde_json::from_str(&raw).unwrap_or_else(|e| panic!("failed to parse {path} as JSON: {e}"))
+    };
+
+    let components: HashMap<String, serde_json::Value> = spec
+      .get("components")
+      .and_then(|c| c.get("schemas"))
+      .and_then(|s| s.as_object())
+      .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+      .unwrap_or_default();
+
+    assert!(!components.is_empty(), "{path} has no components.schemas — wrong spec?");
+
+    let selection: HashMap<NodeId, usize> = HashMap::new();
+    for (name, schema) in &components {
+      let mut expanding = HashSet::new();
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, view_mode);
+      assert!(!blocks.is_empty(), "schema `{name}` from {path} produced 0 blocks in {:?} mode", view_mode);
+      assert!(expanding.is_empty(), "schema `{name}` from {path} left state in `expanding`: {expanding:?}");
+    }
+  }
+
   #[test]
   fn e2e_petstore_all_schemas_resolve() {
     smoke_test_spec("examples/petstore.json");
+  }
+
+  #[test]
+  fn e2e_petstore_all_schemas_resolve_annotated() {
+    smoke_test_spec_with_mode("examples/petstore.json", ViewMode::Annotated);
+  }
+
+  #[test]
+  fn e2e_petstore_all_schemas_resolve_yaml() {
+    smoke_test_spec_with_mode("examples/petstore.json", ViewMode::Yaml);
   }
 
   /// Stripe's `account_business_profile` schema is the canonical
