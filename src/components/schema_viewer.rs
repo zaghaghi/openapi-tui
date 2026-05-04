@@ -675,7 +675,9 @@ fn type_hint_str(node: &Node) -> Option<String> {
     _ => return None,
   };
 
-  if node_get_scalar_str(map, "type") == Some("array") {
+  let type_str = type_str_or_array(map, "type");
+
+  if type_str.as_deref() == Some("array") {
     if let Some(items) = node_get(map, "items") {
       if let Some(item_hint) = type_hint_str(items) {
         return Some(format!("{item_hint}[]"));
@@ -684,13 +686,56 @@ fn type_hint_str(node: &Node) -> Option<String> {
     return Some("array".to_string());
   }
 
-  if let Some(t) = node_get_scalar_str(map, "type") {
-    return Some(t.to_string());
+  if let Some(t) = type_str {
+    if let Some(format) = node_get_scalar_str(map, "format") {
+      return Some(format!("{t} · {format}"));
+    }
+    return Some(t);
   }
   if node_get(map, "properties").is_some() {
     return Some("object".to_string());
   }
   None
+}
+
+/// Read the schema's `type` key whether it's a scalar (`"string"`) or an
+/// array (`["string", "null"]` — OpenAPI 3.1 / JSON Schema nullable form).
+/// "null" entries are filtered; remaining types are joined with `|`.
+/// Returns `None` if the key is missing or yields no non-null types.
+fn type_str_or_array(pairs: &[(String, Node)], key: &str) -> Option<String> {
+  match node_get(pairs, key)? {
+    Node::Scalar(serde_json::Value::String(s)) => Some(s.clone()),
+    Node::Array(items) => {
+      let parts: Vec<String> = items
+        .iter()
+        .filter_map(|item| {
+          match item {
+            Node::Scalar(serde_json::Value::String(s)) if s != "null" => Some(s.clone()),
+            _ => None,
+          }
+        })
+        .collect();
+      if parts.is_empty() {
+        None
+      } else {
+        Some(parts.join("|"))
+      }
+    },
+    _ => None,
+  }
+}
+
+/// Returns true if the schema's `type` is an array containing `"null"`.
+/// Used to mark fields as `nullable` in the detail line for the OpenAPI
+/// 3.1 form (`type: ["string", "null"]`), mirroring the existing
+/// 3.0-style `nullable: true` handling.
+fn type_array_has_null(pairs: &[(String, Node)]) -> bool {
+  match node_get(pairs, "type") {
+    Some(Node::Array(items)) => {
+      items.iter().any(|item| matches!(item, Node::Scalar(serde_json::Value::String(s)) if s == "null"))
+    },
+    _ => false,
+  }
 }
 
 fn value_str(node: &Node) -> Option<String> {
@@ -766,6 +811,11 @@ fn build_detail_line(node: &Node, indent: usize) -> Option<Vec<(Style, String)>>
     if let Some(Node::Scalar(serde_json::Value::Bool(true))) = node_get(map, key) {
       parts.push(key.to_string());
     }
+  }
+  // OpenAPI 3.1 nullable form: `type: [..., "null"]`. Only emit `nullable`
+  // if it isn't already present from the explicit 3.0-style flag above.
+  if type_array_has_null(map) && !parts.iter().any(|p| p == "nullable") {
+    parts.push("nullable".to_string());
   }
 
   if parts.is_empty() {
@@ -1713,7 +1763,10 @@ mod tests {
       })
       .collect();
 
-    assert!(field_lines.iter().any(|l: &String| l == "id (integer)?: 10"), "id line missing/wrong: {field_lines:?}");
+    assert!(
+      field_lines.iter().any(|l: &String| l == "id (integer · int64)?: 10"),
+      "id line missing/wrong: {field_lines:?}"
+    );
     assert!(
       field_lines.iter().any(|l| l == "name (string): \"doggie\"  # the pet's name"),
       "name line missing/wrong: {field_lines:?}"
@@ -2144,5 +2197,62 @@ mod tests {
       },
       _ => unreachable!(),
     }
+  }
+
+  /// Regression: OpenAPI 3.1 nullable form (`type: ["string", "null"]`)
+  /// must produce a non-null type hint and add `nullable` to the detail
+  /// line. Previously the array form fell through and the field showed
+  /// no type hint at all.
+  #[test]
+  fn annotated_nullable_type_array_renders_hint_and_nullable_detail() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "expire_time": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "example": "2026-04-24T08:30:00"
+        }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+
+    let line = first_annotated_field(&blocks, |t| t == "expire_time");
+    let joined: String = line.iter().map(|(_, t)| t.as_str()).collect();
+    assert!(joined.contains("(string · date-time)"), "expected `(string · date-time)` hint: {joined}");
+
+    let block = blocks
+      .iter()
+      .find(|b| {
+        matches!(b, RenderBlock::AnnotatedField { field_line, .. }
+        if field_line.iter().any(|(_, t)| t == "expire_time"))
+      })
+      .expect("expire_time block");
+    match block {
+      RenderBlock::AnnotatedField { detail, .. } => {
+        let detail_text: String =
+          detail.as_ref().expect("detail line for type-array null").iter().map(|(_, t)| t.as_str()).collect();
+        assert!(detail_text.contains("nullable"), "detail should mark type-array-null as nullable: {detail_text}");
+        assert!(detail_text.contains("format: date-time"), "detail should still show format: {detail_text}");
+      },
+      _ => unreachable!(),
+    }
+  }
+
+  /// Format on string fields appears in the type hint (e.g.
+  /// `(string · date-time)`) so users see it without parking the cursor.
+  #[test]
+  fn annotated_format_appears_in_type_hint() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "ts": { "type": "string", "format": "date-time", "example": "2026-04-24T08:30:00" }
+      }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "ts");
+    let joined: String = line.iter().map(|(_, t)| t.as_str()).collect();
+    assert!(joined.contains("(string · date-time)"), "expected `(string · date-time)` hint: {joined}");
   }
 }
