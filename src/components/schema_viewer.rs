@@ -62,7 +62,6 @@ struct Palette {
   description: Style,
 }
 
-#[allow(dead_code)]
 impl Palette {
   fn from_theme(theme: &syntect::highlighting::Theme) -> Self {
     use syntect::{highlighting::Highlighter, parsing::Scope};
@@ -92,6 +91,7 @@ impl Palette {
 /// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
 /// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
 /// components map and the user's per-strip selections explicitly.
+#[allow(clippy::too_many_arguments)]
 fn resolve_walk(
   value: &serde_json::Value,
   parent_path: &str,
@@ -100,6 +100,7 @@ fn resolve_walk(
   variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
   view_mode: ViewMode,
+  palette: Option<&Palette>,
 ) -> Vec<RenderBlock> {
   let node = to_node(value, parent_path, components, variant_selection, expanding);
   let mut blocks = Vec::new();
@@ -110,7 +111,8 @@ fn resolve_walk(
       flush_yaml(indent, &mut buf, &mut blocks);
     },
     ViewMode::Annotated => {
-      emit_node_annotated(&node, indent, &mut blocks);
+      let palette = palette.expect("palette required for annotated mode");
+      emit_node_annotated(&node, indent, &mut blocks, palette);
     },
   }
   blocks
@@ -464,17 +466,17 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
 
 // ── Annotated emitter ────────────────────────────────────────────────────────
 
-fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
+fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>, palette: &Palette) {
   match node {
-    Node::Object(pairs) => emit_object_annotated(pairs, indent, out),
+    Node::Object(pairs) => emit_object_annotated(pairs, indent, out, palette),
     Node::Marker(text) => out.push(RenderBlock::Marker { indent, text: text.clone() }),
     Node::Composed { leading, body } => {
-      emit_node_annotated(leading, indent, out);
-      emit_node_annotated(body, indent, out);
+      emit_node_annotated(leading, indent, out, palette);
+      emit_node_annotated(body, indent, out, palette);
     },
     Node::Variants { id, choices, selected, body } => {
       let mut body_blocks = Vec::new();
-      emit_node_annotated(body, indent, &mut body_blocks);
+      emit_node_annotated(body, indent, &mut body_blocks, palette);
       out.push(RenderBlock::Variants {
         id: id.clone(),
         indent,
@@ -493,7 +495,7 @@ fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
   }
 }
 
-fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<RenderBlock>) {
+fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<RenderBlock>, palette: &Palette) {
   // If this Node::Object looks like an OpenAPI schema (has a `properties`
   // key), render the schema's property children as annotated fields,
   // drawing `required` from the sibling key at this level.
@@ -502,14 +504,14 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
       pairs.iter().find_map(|(k, v)| if k == "required" { node_to_string_array(v) } else { None }).unwrap_or_default();
 
     for (key, child) in props {
-      out.push(build_field_block(key, child, indent, &required));
+      out.push(build_field_block(key, child, indent, &required, palette));
 
       // Nested object: expand its fields at indent + 2.
       if let Some(Node::Object(nested_pairs)) = nested_object_schema(child) {
-        emit_object_annotated(nested_pairs, indent + 2, out);
+        emit_object_annotated(nested_pairs, indent + 2, out, palette);
       } else if let Some(Node::Object(item_pairs)) = array_item_object_schema(child) {
         // Array of objects: expand the item schema's fields at indent + 2.
-        emit_object_annotated(item_pairs, indent + 2, out);
+        emit_object_annotated(item_pairs, indent + 2, out, palette);
       }
     }
     return;
@@ -525,7 +527,7 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
     if key == "required" {
       continue;
     }
-    let block = build_field_block(key, child, indent, &required);
+    let block = build_field_block(key, child, indent, &required, palette);
     out.push(block);
   }
 }
@@ -584,7 +586,13 @@ fn node_to_string_array(node: &Node) -> Option<HashSet<String>> {
   }
 }
 
-fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<String>) -> RenderBlock {
+fn build_field_block(
+  key: &str,
+  child: &Node,
+  indent: usize,
+  required: &HashSet<String>,
+  _palette: &Palette,
+) -> RenderBlock {
   let optional = !required.contains(key);
   let type_hint = type_hint_str(child);
   let value = value_str(child);
@@ -1014,8 +1022,17 @@ impl SchemaViewer {
     self.palette = Some(Palette::from_theme(&self.highlighter_theme_set.themes[SYNTAX_THEME]));
 
     let mut expanding = HashSet::new();
-    self.cached_blocks =
-      resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding, self.view_mode);
+    let palette_ref = self.palette.as_ref();
+    self.cached_blocks = resolve_walk(
+      &schema,
+      "",
+      0,
+      &self.components,
+      &self.variant_selection,
+      &mut expanding,
+      self.view_mode,
+      palette_ref,
+    );
 
     let blocks = std::mem::take(&mut self.cached_blocks);
     let mut logical = 0usize;
@@ -1121,6 +1138,8 @@ impl SchemaViewer {
 
 #[cfg(test)]
 mod tests {
+  use std::sync::OnceLock;
+
   use serde_json::json;
 
   use super::*;
@@ -1128,7 +1147,15 @@ mod tests {
   fn walk(value: serde_json::Value, components: HashMap<String, serde_json::Value>) -> Vec<RenderBlock> {
     let selection = HashMap::new();
     let mut expanding = HashSet::new();
-    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml)
+    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml, None)
+  }
+
+  fn test_palette() -> &'static Palette {
+    static PALETTE: OnceLock<Palette> = OnceLock::new();
+    PALETTE.get_or_init(|| {
+      let theme_set = syntect::highlighting::ThemeSet::load_defaults();
+      Palette::from_theme(&theme_set.themes[SYNTAX_THEME])
+    })
   }
 
   #[test]
@@ -1349,7 +1376,7 @@ mod tests {
     selection.insert("/anyOf".to_string(), 1);
 
     let mut expanding = HashSet::new();
-    let blocks = resolve_walk(&value, "", 0, &HashMap::new(), &selection, &mut expanding, ViewMode::Yaml);
+    let blocks = resolve_walk(&value, "", 0, &HashMap::new(), &selection, &mut expanding, ViewMode::Yaml, None);
 
     let v = blocks
       .iter()
@@ -1399,7 +1426,7 @@ mod tests {
     let mut walked = 0usize;
     for (name, schema) in &components {
       let mut expanding = HashSet::new();
-      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml, None);
       assert!(
         !blocks.is_empty(),
         "schema `{name}` from {path} produced 0 RenderBlocks (likely a serialization error swallowed somewhere)"
@@ -1503,10 +1530,15 @@ mod tests {
 
     assert!(!components.is_empty(), "{path} has no components.schemas — wrong spec?");
 
+    let palette_arg = match view_mode {
+      ViewMode::Annotated => Some(test_palette()),
+      ViewMode::Yaml => None,
+    };
+
     let selection: HashMap<NodeId, usize> = HashMap::new();
     for (name, schema) in &components {
       let mut expanding = HashSet::new();
-      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, view_mode);
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, view_mode, palette_arg);
       assert!(!blocks.is_empty(), "schema `{name}` from {path} produced 0 blocks in {:?} mode", view_mode);
       assert!(expanding.is_empty(), "schema `{name}` from {path} left state in `expanding`: {expanding:?}");
     }
@@ -1551,7 +1583,7 @@ mod tests {
     let abp = components.get("account_business_profile").expect("stripe components.schemas.account_business_profile");
     let selection = HashMap::new();
     let mut expanding = HashSet::new();
-    let blocks = resolve_walk(abp, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
+    let blocks = resolve_walk(abp, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml, None);
 
     fn find_variants_with_choice<'a>(blocks: &'a [RenderBlock], choice: &str) -> Option<&'a RenderBlock> {
       for b in blocks {
@@ -1601,7 +1633,7 @@ mod tests {
       let schema = components.get(*name).unwrap_or_else(|| panic!("missing stripe schema `{name}`"));
       let selection = HashMap::new();
       let mut expanding = HashSet::new();
-      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml, None);
       assert!(!blocks.is_empty(), "stripe schema `{name}` produced 0 blocks");
       assert!(expanding.is_empty(), "stripe schema `{name}` left state in expanding: {expanding:?}");
     }
@@ -1610,7 +1642,7 @@ mod tests {
   fn walk_annotated(value: serde_json::Value, components: HashMap<String, serde_json::Value>) -> Vec<RenderBlock> {
     let selection = HashMap::new();
     let mut expanding = HashSet::new();
-    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Annotated)
+    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Annotated, Some(test_palette()))
   }
 
   #[test]
