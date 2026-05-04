@@ -138,10 +138,10 @@ impl Pane for ResponsePane {
         self.init_schema(state)?;
       },
       Action::Down => {
-        self.schema_viewer.down();
+        self.schema_viewer.down()?;
       },
       Action::Up => {
-        self.schema_viewer.up();
+        self.schema_viewer.up()?;
       },
       Action::Tab(index) if index < self.schemas.len().try_into()? => {
         self.schemas_index = index.try_into()?;

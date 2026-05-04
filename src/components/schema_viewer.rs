@@ -782,6 +782,7 @@ impl SchemaViewer {
     self.variant_selection.clear();
     self.variant_scopes.clear();
     self.cached_blocks.clear();
+    self.view_mode = ViewMode::default();
   }
 
   pub fn set(&mut self, schema: serde_json::Value) -> Result<()> {
@@ -789,6 +790,7 @@ impl SchemaViewer {
     self.name_history = vec![];
     self.line_offset_history = vec![];
     self.variant_selection.clear();
+    self.view_mode = ViewMode::default();
     self.set_styles(schema)?;
     self.go()
   }
@@ -851,12 +853,37 @@ impl SchemaViewer {
     }
   }
 
-  pub fn down(&mut self) {
-    self.line_offset = self.line_offset.saturating_add(1).min(self.styles.len().saturating_sub(1));
+  pub fn down(&mut self) -> Result<()> {
+    let last_logical = self.visible_to_logical.last().copied().unwrap_or(0);
+    self.line_offset = self.line_offset.saturating_add(1).min(last_logical);
+    self.redraw_at_cursor()
   }
 
-  pub fn up(&mut self) {
+  pub fn up(&mut self) -> Result<()> {
     self.line_offset = self.line_offset.saturating_sub(1);
+    self.redraw_at_cursor()
+  }
+
+  pub fn toggle_view(&mut self, schema: &serde_json::Value) -> Result<()> {
+    self.view_mode = match self.view_mode {
+      ViewMode::Annotated => ViewMode::Yaml,
+      ViewMode::Yaml => ViewMode::Annotated,
+    };
+    self.set_styles(schema.clone())
+  }
+
+  fn redraw_at_cursor(&mut self) -> Result<()> {
+    // Reset visible state and re-run render_blocks against the cached emit
+    // output. Cheap: no IR walk, no re-emit.
+    self.styles = vec![];
+    self.visible_to_logical = vec![];
+    self.variant_scopes = vec![];
+
+    let blocks = std::mem::take(&mut self.cached_blocks);
+    let mut logical = 0usize;
+    let result = self.render_blocks(&blocks, &mut logical);
+    self.cached_blocks = blocks;
+    result
   }
 
   pub fn next_variant(&mut self, schema: &serde_json::Value) -> Result<()> {
@@ -1744,5 +1771,30 @@ mod tests {
       .collect();
     assert!(!yaml.is_empty(), "fallback YAML should be non-empty: {yaml}");
     assert!(yaml.contains("root_string"), "fallback YAML missing the string value: {yaml}");
+  }
+
+  #[test]
+  fn toggle_view_preserves_variant_selection() {
+    let mut viewer = SchemaViewer::default();
+    let schema = json!({
+      "anyOf": [
+        { "type": "object", "x-tag": "first" },
+        { "type": "object", "x-tag": "second" }
+      ]
+    });
+    viewer.set(schema.clone()).unwrap();
+
+    // Force selection 1 by directly mutating variant_selection (replicates
+    // what step_variant would do). Then re-render so cached_blocks reflect it.
+    viewer.variant_selection.insert("/anyOf".to_string(), 1);
+    viewer.set_styles(schema.clone()).unwrap();
+
+    // Toggle to YAML and back.
+    viewer.toggle_view(&schema).unwrap();
+    assert_eq!(viewer.view_mode, ViewMode::Yaml);
+    viewer.toggle_view(&schema).unwrap();
+    assert_eq!(viewer.view_mode, ViewMode::Annotated);
+
+    assert_eq!(viewer.variant_selection.get("/anyOf").copied(), Some(1));
   }
 }
