@@ -36,7 +36,6 @@ pub struct VariantScope {
 /// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
 /// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
 /// components map and the user's per-strip selections explicitly.
-#[allow(dead_code)]
 fn resolve_walk(
   value: &serde_json::Value,
   parent_path: &str,
@@ -56,7 +55,6 @@ fn resolve_walk(
 /// Returns the bare component name if `value` is exactly `{"$ref":
 /// "#/components/schemas/<name>"}`, else None. We deliberately reject other
 /// `$ref` shapes (parameters, responses, external) — those stay literal.
-#[allow(dead_code)]
 fn ref_target_name(value: &serde_json::Value) -> Option<&str> {
   let obj = value.as_object()?;
   if obj.len() != 1 {
@@ -377,7 +375,6 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
 }
 
 /// Prepend `n` spaces to each non-empty line.
-#[allow(dead_code)]
 fn indent_lines(s: &str, n: usize) -> String {
   if n == 0 {
     return s.to_string();
@@ -404,6 +401,9 @@ pub struct SchemaViewer {
   name_history: Vec<String>,
   line_offset_history: Vec<usize>,
 
+  variant_selection: HashMap<NodeId, usize>,
+  variant_scopes: Vec<VariantScope>,
+
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
 }
@@ -416,6 +416,8 @@ impl Default for SchemaViewer {
       line_offset: 0,
       name_history: Vec::default(),
       line_offset_history: Vec::default(),
+      variant_selection: HashMap::default(),
+      variant_scopes: Vec::default(),
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
     }
@@ -437,12 +439,15 @@ impl SchemaViewer {
     self.name_history = vec![];
     self.line_offset_history = vec![];
     self.styles = vec![];
+    self.variant_selection.clear();
+    self.variant_scopes.clear();
   }
 
   pub fn set(&mut self, schema: serde_json::Value) -> Result<()> {
     self.line_offset = 0;
     self.name_history = vec![];
     self.line_offset_history = vec![];
+    self.variant_selection.clear();
     self.set_styles(schema)?;
     self.go()
   }
@@ -504,6 +509,40 @@ impl SchemaViewer {
     self.line_offset = self.line_offset.saturating_sub(1);
   }
 
+  pub fn next_variant(&mut self, schema: &serde_json::Value) -> Result<()> {
+    self.step_variant(schema, 1)
+  }
+
+  pub fn prev_variant(&mut self, schema: &serde_json::Value) -> Result<()> {
+    self.step_variant(schema, -1)
+  }
+
+  fn step_variant(&mut self, schema: &serde_json::Value, delta: i32) -> Result<()> {
+    // Find the innermost (last-pushed, smallest range) scope containing the cursor.
+    let cursor = self.line_offset;
+    let scope = self
+      .variant_scopes
+      .iter()
+      .filter(|s| s.line_range.contains(&cursor))
+      .min_by_key(|s| s.line_range.end - s.line_range.start)
+      .cloned();
+
+    let Some(scope) = scope else {
+      return Ok(());
+    };
+    if scope.choice_count == 0 {
+      return Ok(());
+    }
+
+    let current = self.variant_selection.get(&scope.id).copied().unwrap_or(0);
+    let count = scope.choice_count as i32;
+    let next = ((current as i32 + delta).rem_euclid(count)) as usize;
+    self.variant_selection.insert(scope.id, next);
+
+    self.set_styles(schema.clone())?;
+    Ok(())
+  }
+
   pub fn schema_path(&self) -> Vec<String> {
     self.name_history.clone()
   }
@@ -523,12 +562,42 @@ impl SchemaViewer {
 
   fn set_styles(&mut self, schema: serde_json::Value) -> Result<()> {
     self.styles = vec![];
-    let yaml_schema = serde_yaml::to_string(&schema)?;
+    self.variant_scopes = vec![];
+
+    let mut expanding = HashSet::new();
+    let blocks = resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding);
+
+    self.render_blocks(&blocks)?;
+    Ok(())
+  }
+
+  fn render_blocks(&mut self, blocks: &[RenderBlock]) -> Result<()> {
+    for block in blocks {
+      match block {
+        RenderBlock::Yaml(text) => self.render_yaml_block(text)?,
+        RenderBlock::Marker { indent, text } => self.render_marker(*indent, text),
+        RenderBlock::Variants { id, indent, choices, selected, body_blocks } => {
+          let start = self.styles.len();
+          self.render_variant_strip(*indent, choices, *selected);
+          self.render_blocks(body_blocks)?;
+          let end = self.styles.len();
+          self.variant_scopes.push(VariantScope {
+            line_range: start..end,
+            id: id.clone(),
+            choice_count: choices.len(),
+          });
+        },
+      }
+    }
+    Ok(())
+  }
+
+  fn render_yaml_block(&mut self, text: &str) -> Result<()> {
     let mut highlighter = HighlightLines::new(
       self.highlighter_syntax_set.find_syntax_by_extension("yaml").expect("yaml syntax highlighter not found"),
       &self.highlighter_theme_set.themes[SYNTAX_THEME],
     );
-    for (line_num, line) in LinesWithEndings::from(yaml_schema.as_str()).enumerate() {
+    for line in LinesWithEndings::from(text) {
       let mut line_styles: Vec<(Style, String)> = highlighter
         .highlight_line(line, &self.highlighter_syntax_set)?
         .into_iter()
@@ -555,10 +624,40 @@ impl SchemaViewer {
           (style, segment.1.to_string())
         })
         .collect();
-      line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num + 1)));
+      let line_num = self.styles.len() + 1;
+      line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num)));
       self.styles.push(line_styles);
     }
     Ok(())
+  }
+
+  fn render_marker(&mut self, indent: usize, text: &str) {
+    let mut line_styles = vec![
+      (Style::default(), " ".repeat(indent)),
+      (Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC).add_modifier(Modifier::DIM), text.to_string()),
+    ];
+    self.push_styled_line(&mut line_styles);
+  }
+
+  fn render_variant_strip(&mut self, indent: usize, choices: &[String], selected: usize) {
+    let mut line_styles: Vec<(Style, String)> = vec![(Style::default(), " ".repeat(indent))];
+    for (i, choice) in choices.iter().enumerate() {
+      if i > 0 {
+        line_styles.push((Style::default().add_modifier(Modifier::DIM), " · ".to_string()));
+      }
+      if i == selected {
+        line_styles.push((Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED), format!("[{choice}]")));
+      } else {
+        line_styles.push((Style::default().add_modifier(Modifier::DIM), choice.clone()));
+      }
+    }
+    self.push_styled_line(&mut line_styles);
+  }
+
+  fn push_styled_line(&mut self, line_styles: &mut Vec<(Style, String)>) {
+    let line_num = self.styles.len() + 1;
+    line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num)));
+    self.styles.push(std::mem::take(line_styles));
   }
 
   fn set_styles_by_name(&mut self, schema_name: String) -> Result<()> {
