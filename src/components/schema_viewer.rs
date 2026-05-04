@@ -687,17 +687,42 @@ fn type_hint_str(node: &Node) -> Option<String> {
   }
 
   if let Some(t) = type_str {
-    // When `format` is present, show only the format — `(date-time)` reads
-    // better than `(string · date-time)`, and the type is implied.
+    let collapsed = collapse_numeric(&t);
+    // Numeric types always render as `(number)` regardless of format —
+    // `int32`/`int64`/`float`/`decimal` are noise for visual scanning.
+    // Format remains in the detail line for users who need precision.
+    if collapsed == "number" {
+      return Some(collapsed);
+    }
+    // Mixed type unions (e.g. `string|integer`) skip format substitution
+    // and render as-is.
+    if collapsed.contains('|') {
+      return Some(collapsed);
+    }
+    // Single non-numeric type with a format: format wins (`(date-time)`).
     if let Some(format) = node_get_scalar_str(map, "format") {
       return Some(format.to_string());
     }
-    return Some(t);
+    return Some(collapsed);
   }
   if node_get(map, "properties").is_some() {
     return Some("object".to_string());
   }
   None
+}
+
+/// Replace any `integer` or `number` segment in a `|`-joined type union
+/// with `number`, deduplicating while preserving order. `"integer"` →
+/// `"number"`; `"integer|string"` → `"number|string"`;
+/// `"integer|number"` → `"number"`.
+fn collapse_numeric(type_str: &str) -> String {
+  let mut seen = HashSet::new();
+  type_str
+    .split('|')
+    .map(|p| if matches!(p, "integer" | "number") { "number" } else { p })
+    .filter(|p| seen.insert(p.to_string()))
+    .collect::<Vec<_>>()
+    .join("|")
 }
 
 /// Read the schema's `type` key whether it's a scalar (`"string"`) or an
@@ -1765,7 +1790,7 @@ mod tests {
       })
       .collect();
 
-    assert!(field_lines.iter().any(|l: &String| l == "id (int64)?: 10"), "id line missing/wrong: {field_lines:?}");
+    assert!(field_lines.iter().any(|l: &String| l == "id (number)?: 10"), "id line missing/wrong: {field_lines:?}");
     assert!(
       field_lines.iter().any(|l| l == "name (string): \"doggie\"  # the pet's name"),
       "name line missing/wrong: {field_lines:?}"
@@ -1817,7 +1842,7 @@ mod tests {
       .collect();
 
     assert!(field_lines.iter().any(|l: &String| l == "category (object)?:"), "category parent line: {field_lines:?}");
-    assert!(field_lines.iter().any(|l| l == "  id (integer)?: 1"), "nested id at indent 2: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "  id (number)?: 1"), "nested id at indent 2: {field_lines:?}");
     assert!(field_lines.iter().any(|l| l == "  name (string)?: \"Dogs\""), "nested name at indent 2: {field_lines:?}");
   }
 
@@ -1850,7 +1875,7 @@ mod tests {
 
     assert!(field_lines.iter().any(|l: &String| l == "scalars (string[])?"), "string[] hint: {field_lines:?}");
     assert!(field_lines.iter().any(|l| l == "objects (object[])?:"), "object[] hint with colon: {field_lines:?}");
-    assert!(field_lines.iter().any(|l| l == "  id (integer)?"), "object[] expansion: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "  id (number)?"), "object[] expansion: {field_lines:?}");
   }
 
   #[test]
@@ -2236,6 +2261,45 @@ mod tests {
         assert!(detail_text.contains("format: date-time"), "detail should still show format: {detail_text}");
       },
       _ => unreachable!(),
+    }
+  }
+
+  /// All numeric types — `integer`, `number`, with any numeric format
+  /// (`int32`/`int64`/`float`/`double`/`decimal`) — collapse to
+  /// `(number)` in the type hint. Format still appears in the detail
+  /// line.
+  #[test]
+  fn annotated_numeric_types_collapse_to_number() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "a": { "type": "integer", "format": "int64", "example": 1 },
+        "b": { "type": "integer", "format": "int32", "example": 2 },
+        "c": { "type": "number", "format": "float", "example": 1.5 },
+        "d": { "type": "number", "format": "double", "example": 2.5 },
+        "e": { "type": "number", "format": "decimal", "example": 9.99 },
+        "f": { "type": "integer" },
+        "g": { "type": ["integer", "null"] }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+    let field_lines: Vec<String> = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    for key in ["a", "b", "c", "d", "e", "f", "g"] {
+      let line = field_lines
+        .iter()
+        .find(|l| l.starts_with(&format!("{key} ")))
+        .unwrap_or_else(|| panic!("missing field `{key}`; lines: {field_lines:?}"));
+      assert!(line.contains("(number)"), "field `{key}` should hint `(number)`, got: {line}");
     }
   }
 
