@@ -511,6 +511,11 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
       } else if let Some(Node::Object(item_pairs)) = array_item_object_schema(child) {
         // Array of objects: expand the item schema's fields at indent + 2.
         emit_object_annotated(item_pairs, indent + 2, out, palette);
+      } else if matches!(child, Node::Composed { .. } | Node::Variants { .. }) {
+        // Composition (allOf marker + body, or anyOf/oneOf variants
+        // wrapped with sibling keys) — emit the marker / variant strip
+        // and its body beneath the field line.
+        emit_node_annotated(child, indent + 2, out, palette);
       }
     }
     return;
@@ -614,7 +619,9 @@ fn build_field_block(
     spans.push((palette.optional, "?".to_string()));
   }
 
-  let expands = nested_object_schema(child).is_some() || array_item_object_schema(child).is_some();
+  let expands = nested_object_schema(child).is_some()
+    || array_item_object_schema(child).is_some()
+    || matches!(child, Node::Composed { .. } | Node::Variants { .. });
   if value_str(child).is_some() {
     spans.push((palette.colon, ":".to_string()));
     spans.push((Style::default(), " ".to_string()));
@@ -2093,5 +2100,49 @@ mod tests {
     let line = first_annotated_field(&blocks, |t| t == "id");
     let indent_span = line.iter().find(|(_, t)| t == "  ").expect("indent span");
     assert!(indent_span.0.fg.is_none(), "indent whitespace should not be colored");
+  }
+
+  /// Regression: a property whose value is an `anyOf` (with or without
+  /// sibling keys) must produce a `RenderBlock::Variants` so that
+  /// `step_variant` can find a scope to switch in. Before the fix, the
+  /// annotated emit chain saw the property's child as a `Node::Composed`
+  /// or `Node::Variants` and emitted only a leaf field line — no variant
+  /// strip, so `,`/`.` had nothing to act on.
+  #[test]
+  fn annotated_property_with_anyof_emits_variants_block() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "address": {
+          "anyOf": [
+            { "type": "object", "title": "A", "properties": { "city": { "type": "string" } } },
+            { "type": "object", "title": "B", "properties": { "country": { "type": "string" } } }
+          ],
+          "description": "billing address",
+          "nullable": true
+        }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+
+    fn find_variants(blocks: &[RenderBlock]) -> Option<&RenderBlock> {
+      for b in blocks {
+        if let RenderBlock::Variants { body_blocks, .. } = b {
+          return Some(b).or_else(|| find_variants(body_blocks));
+        }
+      }
+      None
+    }
+
+    let variants = find_variants(&blocks)
+      .unwrap_or_else(|| panic!("expected a Variants block for the anyOf property; blocks: {blocks:#?}"));
+
+    match variants {
+      RenderBlock::Variants { choices, .. } => {
+        assert_eq!(choices, &vec!["A".to_string(), "B".to_string()]);
+      },
+      _ => unreachable!(),
+    }
   }
 }
