@@ -31,6 +31,10 @@ pub enum RenderBlock {
   Marker { indent: usize, text: String },
   /// A tab strip plus the body of the currently-selected variant.
   Variants { id: NodeId, indent: usize, choices: Vec<String>, selected: usize, body_blocks: Vec<RenderBlock> },
+  /// A single annotated-mode field line plus optional detail line. The
+  /// detail is spliced into `styles` only when the cursor's logical
+  /// position lands on this field.
+  AnnotatedField { indent: usize, field_line: Vec<(Style, String)>, detail: Option<Vec<(Style, String)>> },
 }
 
 #[derive(Debug, Clone)]
@@ -430,6 +434,7 @@ const SYNTAX_THEME: &str = "Solarized (dark)";
 pub struct SchemaViewer {
   components: HashMap<String, serde_json::Value>,
   styles: Vec<Vec<(Style, String)>>,
+  visible_to_logical: Vec<usize>,
   line_offset: usize,
 
   name_history: Vec<String>,
@@ -449,6 +454,7 @@ impl Default for SchemaViewer {
     Self {
       components: HashMap::default(),
       styles: Vec::default(),
+      visible_to_logical: Vec::default(),
       line_offset: 0,
       name_history: Vec::default(),
       line_offset_history: Vec::default(),
@@ -477,6 +483,7 @@ impl SchemaViewer {
     self.name_history = vec![];
     self.line_offset_history = vec![];
     self.styles = vec![];
+    self.visible_to_logical = vec![];
     self.variant_selection.clear();
     self.variant_scopes.clear();
     self.cached_blocks.clear();
@@ -614,6 +621,7 @@ impl SchemaViewer {
 
   fn set_styles(&mut self, schema: serde_json::Value) -> Result<()> {
     self.styles = vec![];
+    self.visible_to_logical = vec![];
     self.variant_scopes = vec![];
 
     let mut expanding = HashSet::new();
@@ -621,34 +629,44 @@ impl SchemaViewer {
       resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding, self.view_mode);
 
     let blocks = std::mem::take(&mut self.cached_blocks);
-    let result = self.render_blocks(&blocks);
+    let mut logical = 0usize;
+    let result = self.render_blocks(&blocks, &mut logical);
     self.cached_blocks = blocks;
     result?;
     Ok(())
   }
 
-  fn render_blocks(&mut self, blocks: &[RenderBlock]) -> Result<()> {
+  fn render_blocks(&mut self, blocks: &[RenderBlock], logical: &mut usize) -> Result<()> {
     for block in blocks {
       match block {
-        RenderBlock::Yaml(text) => self.render_yaml_block(text)?,
-        RenderBlock::Marker { indent, text } => self.render_marker(*indent, text),
+        RenderBlock::Yaml(text) => self.render_yaml_block(text, logical)?,
+        RenderBlock::Marker { indent, text } => self.render_marker(*indent, text, logical),
         RenderBlock::Variants { id, indent, choices, selected, body_blocks } => {
-          let start = self.styles.len();
-          self.render_variant_strip(*indent, choices, *selected);
-          self.render_blocks(body_blocks)?;
-          let end = self.styles.len();
+          let start = *logical;
+          self.render_variant_strip(*indent, choices, *selected, logical);
+          self.render_blocks(body_blocks, logical)?;
+          let end = *logical;
           self.variant_scopes.push(VariantScope {
             line_range: start..end,
             id: id.clone(),
             choice_count: choices.len(),
           });
         },
+        RenderBlock::AnnotatedField { indent: _, field_line, detail } => {
+          self.push_styled_line(&mut field_line.clone(), *logical);
+          if let Some(detail_line) = detail {
+            if *logical == self.line_offset {
+              self.push_styled_line(&mut detail_line.clone(), *logical);
+            }
+          }
+          *logical += 1;
+        },
       }
     }
     Ok(())
   }
 
-  fn render_yaml_block(&mut self, text: &str) -> Result<()> {
+  fn render_yaml_block(&mut self, text: &str, logical: &mut usize) -> Result<()> {
     let mut highlighter = HighlightLines::new(
       self.highlighter_syntax_set.find_syntax_by_extension("yaml").expect("yaml syntax highlighter not found"),
       &self.highlighter_theme_set.themes[SYNTAX_THEME],
@@ -683,19 +701,22 @@ impl SchemaViewer {
       let line_num = self.styles.len() + 1;
       line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num)));
       self.styles.push(line_styles);
+      self.visible_to_logical.push(*logical);
+      *logical += 1;
     }
     Ok(())
   }
 
-  fn render_marker(&mut self, indent: usize, text: &str) {
+  fn render_marker(&mut self, indent: usize, text: &str, logical: &mut usize) {
     let mut line_styles = vec![
       (Style::default(), " ".repeat(indent)),
       (Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC).add_modifier(Modifier::DIM), text.to_string()),
     ];
-    self.push_styled_line(&mut line_styles);
+    self.push_styled_line(&mut line_styles, *logical);
+    *logical += 1;
   }
 
-  fn render_variant_strip(&mut self, indent: usize, choices: &[String], selected: usize) {
+  fn render_variant_strip(&mut self, indent: usize, choices: &[String], selected: usize, logical: &mut usize) {
     let mut line_styles: Vec<(Style, String)> = vec![(Style::default(), " ".repeat(indent))];
     for (i, choice) in choices.iter().enumerate() {
       if i > 0 {
@@ -707,13 +728,15 @@ impl SchemaViewer {
         line_styles.push((Style::default().add_modifier(Modifier::DIM), choice.clone()));
       }
     }
-    self.push_styled_line(&mut line_styles);
+    self.push_styled_line(&mut line_styles, *logical);
+    *logical += 1;
   }
 
-  fn push_styled_line(&mut self, line_styles: &mut Vec<(Style, String)>) {
+  fn push_styled_line(&mut self, line_styles: &mut Vec<(Style, String)>, logical: usize) {
     let line_num = self.styles.len() + 1;
     line_styles.insert(0, (Style::default().dim(), format!(" {:<3} ", line_num)));
     self.styles.push(std::mem::take(line_styles));
+    self.visible_to_logical.push(logical);
   }
 
   fn set_styles_by_name(&mut self, schema_name: String) -> Result<()> {
@@ -1175,5 +1198,46 @@ mod tests {
       assert!(!blocks.is_empty(), "stripe schema `{name}` produced 0 blocks");
       assert!(expanding.is_empty(), "stripe schema `{name}` left state in expanding: {expanding:?}");
     }
+  }
+
+  #[test]
+  fn annotated_field_detail_appears_only_when_cursor_on_field() {
+    use ratatui::style::Style;
+    let blocks = vec![
+      RenderBlock::AnnotatedField {
+        indent: 0,
+        field_line: vec![(Style::default(), "id (integer)?: 10".to_string())],
+        detail: Some(vec![(Style::default(), "  format: int64".to_string())]),
+      },
+      RenderBlock::AnnotatedField {
+        indent: 0,
+        field_line: vec![(Style::default(), "name (string): \"doggie\"".to_string())],
+        detail: None,
+      },
+    ];
+    let mut viewer = SchemaViewer { cached_blocks: blocks, ..Default::default() };
+
+    // Cursor on first field (logical 0) → detail visible (3 styled lines: field, detail, field)
+    viewer.line_offset = 0;
+    viewer.styles = vec![];
+    viewer.visible_to_logical = vec![];
+    viewer.variant_scopes = vec![];
+    let blocks = std::mem::take(&mut viewer.cached_blocks);
+    let mut logical = 0usize;
+    viewer.render_blocks(&blocks, &mut logical).unwrap();
+    viewer.cached_blocks = blocks;
+    assert_eq!(viewer.styles.len(), 3, "cursor on field 0 should splice detail");
+    assert_eq!(viewer.visible_to_logical, vec![0, 0, 1]);
+
+    // Cursor on second field (logical 1) → no detail (2 styled lines: field, field)
+    viewer.line_offset = 1;
+    viewer.styles = vec![];
+    viewer.visible_to_logical = vec![];
+    let blocks = std::mem::take(&mut viewer.cached_blocks);
+    let mut logical = 0usize;
+    viewer.render_blocks(&blocks, &mut logical).unwrap();
+    viewer.cached_blocks = blocks;
+    assert_eq!(viewer.styles.len(), 2, "cursor on field 1, no detail field");
+    assert_eq!(viewer.visible_to_logical, vec![0, 1]);
   }
 }
