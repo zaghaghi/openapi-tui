@@ -1722,4 +1722,27 @@ mod tests {
     assert_eq!(viewer.styles.len(), 2, "cursor on field 1, no detail field");
     assert_eq!(viewer.visible_to_logical, vec![0, 1]);
   }
+
+  #[test]
+  fn annotated_top_level_scalar_falls_back_to_yaml() {
+    // Test that a truly scalar root (not an object schema) falls back to YAML
+    // representation in annotated mode rather than trying to render fields.
+    let value = serde_json::Value::String("root_string".to_string());
+    let blocks = walk_annotated(value, HashMap::new());
+
+    let has_annotated_field = blocks.iter().any(|b| matches!(b, RenderBlock::AnnotatedField { .. }));
+    assert!(!has_annotated_field, "scalar root should not produce AnnotatedField blocks");
+
+    let yaml: String = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(!yaml.is_empty(), "fallback YAML should be non-empty: {yaml}");
+    assert!(yaml.contains("root_string"), "fallback YAML missing the string value: {yaml}");
+  }
 }
