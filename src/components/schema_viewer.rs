@@ -47,7 +47,6 @@ pub struct VariantScope {
 /// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
 /// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
 /// components map and the user's per-strip selections explicitly.
-#[allow(dead_code)]
 fn resolve_walk(
   value: &serde_json::Value,
   parent_path: &str,
@@ -420,7 +419,6 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
 
 // ── Annotated emitter ────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
   match node {
     Node::Object(pairs) => emit_object_annotated(pairs, indent, out),
@@ -450,7 +448,6 @@ fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
   }
 }
 
-#[allow(dead_code)]
 fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<RenderBlock>) {
   // If this Node::Object looks like an OpenAPI schema (has a `properties`
   // key), render the schema's property children as annotated fields,
@@ -491,7 +488,6 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
 /// Return the `child` Node verbatim if it is an OpenAPI object schema
 /// (has a `properties` key) and is NOT an array. The caller passes the
 /// returned Node to `emit_object_annotated`, which drills into it.
-#[allow(dead_code)]
 fn nested_object_schema(child: &Node) -> Option<&Node> {
   let pairs = match child {
     Node::Object(p) => p,
@@ -509,7 +505,6 @@ fn nested_object_schema(child: &Node) -> Option<&Node> {
 
 /// If `child` is `{type: array, items: <schema with properties>}`, return
 /// the items Node so the caller can drill into it.
-#[allow(dead_code)]
 fn array_item_object_schema(child: &Node) -> Option<&Node> {
   let pairs = match child {
     Node::Object(p) => p,
@@ -530,7 +525,6 @@ fn array_item_object_schema(child: &Node) -> Option<&Node> {
   }
 }
 
-#[allow(dead_code)]
 fn node_to_string_array(node: &Node) -> Option<HashSet<String>> {
   if let Node::Array(items) = node {
     let mut set = HashSet::new();
@@ -545,7 +539,6 @@ fn node_to_string_array(node: &Node) -> Option<HashSet<String>> {
   }
 }
 
-#[allow(dead_code)]
 fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<String>) -> RenderBlock {
   let optional = !required.contains(key);
   let type_hint = type_hint_str(child);
@@ -579,7 +572,6 @@ fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<
   RenderBlock::AnnotatedField { indent, field_line, detail }
 }
 
-#[allow(dead_code)]
 fn type_hint_str(node: &Node) -> Option<String> {
   let map = match node {
     Node::Object(pairs) => pairs,
@@ -604,7 +596,6 @@ fn type_hint_str(node: &Node) -> Option<String> {
   None
 }
 
-#[allow(dead_code)]
 fn value_str(node: &Node) -> Option<String> {
   let map = match node {
     Node::Object(pairs) => pairs,
@@ -624,7 +615,6 @@ fn value_str(node: &Node) -> Option<String> {
   None
 }
 
-#[allow(dead_code)]
 fn scalar_to_display(node: &Node) -> String {
   match node {
     Node::Scalar(serde_json::Value::String(s)) => format!("\"{}\"", s.replace('"', "\\\"")),
@@ -633,7 +623,6 @@ fn scalar_to_display(node: &Node) -> String {
   }
 }
 
-#[allow(dead_code)]
 fn description_first_line(node: &Node) -> Option<String> {
   let map = match node {
     Node::Object(pairs) => pairs,
@@ -643,7 +632,6 @@ fn description_first_line(node: &Node) -> Option<String> {
   Some(desc.lines().next().unwrap_or("").to_string())
 }
 
-#[allow(dead_code)]
 fn build_detail_line(node: &Node, indent: usize) -> Option<Vec<(Style, String)>> {
   let map = match node {
     Node::Object(pairs) => pairs,
@@ -693,12 +681,10 @@ fn build_detail_line(node: &Node, indent: usize) -> Option<Vec<(Style, String)>>
   Some(vec![(style, detail_text)])
 }
 
-#[allow(dead_code)]
 fn node_get<'a>(pairs: &'a [(String, Node)], key: &str) -> Option<&'a Node> {
   pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
-#[allow(dead_code)]
 fn node_get_scalar_str<'a>(pairs: &'a [(String, Node)], key: &str) -> Option<&'a str> {
   if let Some(Node::Scalar(serde_json::Value::String(s))) = node_get(pairs, key) {
     Some(s.as_str())
@@ -869,7 +855,16 @@ impl SchemaViewer {
       ViewMode::Annotated => ViewMode::Yaml,
       ViewMode::Yaml => ViewMode::Annotated,
     };
-    self.set_styles(schema.clone())
+    self.set_styles(schema.clone())?;
+    self.clamp_cursor();
+    Ok(())
+  }
+
+  /// Clamp `line_offset` to the last logical line index so it stays a valid
+  /// cursor target after `set_styles` rebuilds `visible_to_logical`.
+  fn clamp_cursor(&mut self) {
+    let last = self.visible_to_logical.last().copied().unwrap_or(0);
+    self.line_offset = self.line_offset.min(last);
   }
 
   fn redraw_at_cursor(&mut self) -> Result<()> {
@@ -920,7 +915,7 @@ impl SchemaViewer {
     // The new selected variant may have a shorter body than the previous
     // one; clamp the cursor so it stays inside the new line range and the
     // user can keep pressing `,` / `.` without first scrolling.
-    self.line_offset = self.line_offset.min(self.styles.len().saturating_sub(1));
+    self.clamp_cursor();
     Ok(())
   }
 
@@ -1832,5 +1827,32 @@ mod tests {
     assert_eq!(viewer.view_mode, ViewMode::Annotated);
 
     assert_eq!(viewer.variant_selection.get("/anyOf").copied(), Some(1));
+  }
+
+  #[test]
+  fn toggle_view_clamps_cursor_after_view_change() {
+    let mut viewer = SchemaViewer::default();
+    // A schema that renders to fewer lines in YAML than in annotated.
+    let schema = json!({
+      "type": "object",
+      "properties": {
+        "a": { "type": "string", "format": "date" },
+        "b": { "type": "integer", "format": "int64" },
+        "c": { "type": "boolean" }
+      }
+    });
+
+    viewer.set(schema.clone()).unwrap();
+    // Force the cursor near the end of the annotated render.
+    let max_logical = viewer.visible_to_logical.last().copied().unwrap_or(0);
+    viewer.line_offset = max_logical;
+    viewer.toggle_view(&schema).unwrap();
+    let new_max = viewer.visible_to_logical.last().copied().unwrap_or(0);
+    assert!(
+      viewer.line_offset <= new_max,
+      "line_offset ({}) should be clamped to <= new max logical ({}) after toggle",
+      viewer.line_offset,
+      new_max
+    );
   }
 }
