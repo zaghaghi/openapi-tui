@@ -793,6 +793,7 @@ pub struct SchemaViewer {
   variant_scopes: Vec<VariantScope>,
   cached_blocks: Vec<RenderBlock>,
   view_mode: ViewMode,
+  palette: Option<Palette>,
 
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
@@ -811,6 +812,7 @@ impl Default for SchemaViewer {
       variant_scopes: Vec::default(),
       cached_blocks: Vec::default(),
       view_mode: ViewMode::default(),
+      palette: None,
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
     }
@@ -837,6 +839,7 @@ impl SchemaViewer {
     self.variant_scopes.clear();
     self.cached_blocks.clear();
     self.view_mode = ViewMode::default();
+    self.palette = None;
   }
 
   pub fn set(&mut self, schema: serde_json::Value) -> Result<()> {
@@ -1008,6 +1011,7 @@ impl SchemaViewer {
     self.styles = vec![];
     self.visible_to_logical = vec![];
     self.variant_scopes = vec![];
+    self.palette = Some(Palette::from_theme(&self.highlighter_theme_set.themes[SYNTAX_THEME]));
 
     let mut expanding = HashSet::new();
     self.cached_blocks =
