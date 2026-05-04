@@ -923,4 +923,126 @@ mod tests {
       .collect();
     assert!(body_yaml.contains("x-tag: second"), "expected second variant in body: {body_yaml}");
   }
+
+  /// Walk every component schema in a real OpenAPI spec through `resolve_walk`
+  /// and assert the resolution pipeline doesn't panic, return errors, or
+  /// produce empty output for non-empty inputs. Used as an end-to-end smoke
+  /// test against `examples/petstore.json` and `examples/stripe/spec.yml`.
+  fn smoke_test_spec(path: &str) {
+    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"));
+    let spec: serde_json::Value = if path.ends_with(".yml") || path.ends_with(".yaml") {
+      serde_yaml::from_str(&raw).unwrap_or_else(|e| panic!("failed to parse {path} as YAML: {e}"))
+    } else {
+      serde_json::from_str(&raw).unwrap_or_else(|e| panic!("failed to parse {path} as JSON: {e}"))
+    };
+
+    let components: HashMap<String, serde_json::Value> = spec
+      .get("components")
+      .and_then(|c| c.get("schemas"))
+      .and_then(|s| s.as_object())
+      .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+      .unwrap_or_default();
+
+    assert!(!components.is_empty(), "{path} has no components.schemas — wrong spec?");
+
+    let selection: HashMap<NodeId, usize> = HashMap::new();
+    let mut walked = 0usize;
+    for (name, schema) in &components {
+      let mut expanding = HashSet::new();
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding);
+      assert!(
+        !blocks.is_empty(),
+        "schema `{name}` from {path} produced 0 RenderBlocks (likely a serialization error swallowed somewhere)"
+      );
+      assert!(expanding.is_empty(), "schema `{name}` from {path} left state in `expanding`: {expanding:?}");
+      walked += 1;
+    }
+    assert!(walked > 0);
+    eprintln!("[smoke] walked {walked} schemas from {path} without panic");
+  }
+
+  #[test]
+  fn e2e_petstore_all_schemas_resolve() {
+    smoke_test_spec("examples/petstore.json");
+  }
+
+  /// Stripe's `account_business_profile` schema is the canonical
+  /// sibling-keys-with-anyOf pattern: properties like `support_address`
+  /// are `anyOf: [$ref Address]` plus sibling `description` and
+  /// `nullable`. Confirm the resolved tree contains a Variants block
+  /// with `address` as a choice for `support_address`. We walk only
+  /// this schema (not the much larger `account` schema) because Stripe
+  /// has dense cross-references that produce O(branch^depth) blowup
+  /// without memoization — see follow-up note in the design doc risks.
+  #[test]
+  fn e2e_stripe_account_business_profile_shape() {
+    let raw = std::fs::read_to_string("examples/stripe/spec.yml").expect("read stripe spec");
+    let spec: serde_json::Value = serde_yaml::from_str(&raw).expect("parse stripe spec");
+    let components: HashMap<String, serde_json::Value> = spec
+      .get("components")
+      .and_then(|c| c.get("schemas"))
+      .and_then(|s| s.as_object())
+      .expect("components.schemas")
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect();
+
+    let abp = components.get("account_business_profile").expect("stripe components.schemas.account_business_profile");
+    let selection = HashMap::new();
+    let mut expanding = HashSet::new();
+    let blocks = resolve_walk(abp, "", 0, &components, &selection, &mut expanding);
+
+    fn find_variants_with_choice<'a>(blocks: &'a [RenderBlock], choice: &str) -> Option<&'a RenderBlock> {
+      for b in blocks {
+        if let RenderBlock::Variants { choices, body_blocks, .. } = b {
+          if choices.iter().any(|c| c == choice) {
+            return Some(b);
+          }
+          if let Some(inner) = find_variants_with_choice(body_blocks, choice) {
+            return Some(inner);
+          }
+        }
+      }
+      None
+    }
+
+    assert!(
+      find_variants_with_choice(&blocks, "address").is_some(),
+      "expected Variants block with choice `address` (from support_address.anyOf)"
+    );
+    assert!(
+      find_variants_with_choice(&blocks, "account_annual_revenue").is_some(),
+      "expected Variants block with choice `account_annual_revenue` (from annual_revenue.anyOf)"
+    );
+  }
+
+  /// Walks a curated set of small Stripe component schemas as a smoke
+  /// test against real-world OpenAPI shapes. We avoid `account` and
+  /// other massive schemas because the resolution pipeline has no
+  /// memoization and exhibits exponential blowup on highly
+  /// cross-referenced trees.
+  #[test]
+  fn e2e_stripe_sample_schemas_resolve() {
+    let raw = std::fs::read_to_string("examples/stripe/spec.yml").expect("read stripe spec");
+    let spec: serde_json::Value = serde_yaml::from_str(&raw).expect("parse stripe spec");
+    let components: HashMap<String, serde_json::Value> = spec
+      .get("components")
+      .and_then(|c| c.get("schemas"))
+      .and_then(|s| s.as_object())
+      .expect("components.schemas")
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect();
+
+    let sample = ["address", "account_annual_revenue", "account_monthly_estimated_revenue", "account_business_profile"];
+
+    for name in &sample {
+      let schema = components.get(*name).unwrap_or_else(|| panic!("missing stripe schema `{name}`"));
+      let selection = HashMap::new();
+      let mut expanding = HashSet::new();
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding);
+      assert!(!blocks.is_empty(), "stripe schema `{name}` produced 0 blocks");
+      assert!(expanding.is_empty(), "stripe schema `{name}` left state in expanding: {expanding:?}");
+    }
+  }
 }
