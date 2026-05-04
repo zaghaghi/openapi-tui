@@ -178,7 +178,7 @@ impl Pane for RequestPane {
         self.focused = true;
         static STATUS_LINE: &str =
           "[1-9 → select tab] [g,b → go/back definitions] [, . → switch variant] [a → toggle annotated/YAML]";
-        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+        return Ok(Some(Action::StatusLine(STATUS_LINE.into())));
       },
       Action::UnFocus => {
         self.focused = false;

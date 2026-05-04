@@ -72,7 +72,7 @@ impl Pane for AddressPane {
       Action::Focus => {
         self.focused = true;
         static STATUS_LINE: &str = "[ENTER → request]";
-        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+        return Ok(Some(Action::StatusLine(STATUS_LINE.into())));
       },
       Action::UnFocus => {
         self.focused = false;

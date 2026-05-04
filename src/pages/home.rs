@@ -22,6 +22,11 @@ pub struct Home {
 }
 
 impl Home {
+  fn default_status_line() -> String {
+    const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+    format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]")
+  }
+
   pub fn new() -> Result<Self> {
     let focused_border_style = Style::default().fg(Color::LightGreen);
 
@@ -52,10 +57,7 @@ impl Page for Home {
 
   fn focus(&mut self) -> Result<()> {
     if let Some(command_tx) = &self.command_tx {
-      const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-      let status_line =
-        format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]");
-      command_tx.send(Action::StatusLine(status_line))?;
+      command_tx.send(Action::StatusLine(Self::default_status_line()))?;
     }
     Ok(())
   }
@@ -80,6 +82,7 @@ impl Page for Home {
           actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = next_index;
+        actions.push(Some(Action::StatusLine(Self::default_status_line())));
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           actions.push(pane.update(Action::Focus, state)?);
         }
@@ -90,6 +93,7 @@ impl Page for Home {
           actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = prev_index;
+        actions.push(Some(Action::StatusLine(Self::default_status_line())));
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           actions.push(pane.update(Action::Focus, state)?);
         }
