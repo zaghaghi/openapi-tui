@@ -16,6 +16,13 @@ use crate::state::State;
 
 pub type NodeId = String;
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ViewMode {
+  #[default]
+  Annotated,
+  Yaml,
+}
+
 #[derive(Debug, Clone)]
 pub enum RenderBlock {
   /// A chunk of YAML text already indented to its target column.
@@ -36,6 +43,7 @@ pub struct VariantScope {
 /// Resolves OpenAPI composition (`$ref`, `allOf`, `anyOf`, `oneOf`) into a
 /// flat `Vec<RenderBlock>` that the renderer can consume. Pure: takes the
 /// components map and the user's per-strip selections explicitly.
+#[allow(dead_code)]
 fn resolve_walk(
   value: &serde_json::Value,
   parent_path: &str,
@@ -43,7 +51,9 @@ fn resolve_walk(
   components: &HashMap<String, serde_json::Value>,
   variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
+  view_mode: ViewMode,
 ) -> Vec<RenderBlock> {
+  let _ = view_mode; // dispatched in Task 4
   let node = to_node(value, parent_path, components, variant_selection, expanding);
   let mut blocks = Vec::new();
   let mut buf = String::new();
@@ -428,6 +438,7 @@ pub struct SchemaViewer {
   variant_selection: HashMap<NodeId, usize>,
   variant_scopes: Vec<VariantScope>,
   cached_blocks: Vec<RenderBlock>,
+  view_mode: ViewMode,
 
   highlighter_syntax_set: SyntaxSet,
   highlighter_theme_set: ThemeSet,
@@ -444,6 +455,7 @@ impl Default for SchemaViewer {
       variant_selection: HashMap::default(),
       variant_scopes: Vec::default(),
       cached_blocks: Vec::default(),
+      view_mode: ViewMode::default(),
       highlighter_syntax_set: SyntaxSet::load_defaults_newlines(),
       highlighter_theme_set: ThemeSet::load_defaults(),
     }
@@ -605,7 +617,8 @@ impl SchemaViewer {
     self.variant_scopes = vec![];
 
     let mut expanding = HashSet::new();
-    self.cached_blocks = resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding);
+    self.cached_blocks =
+      resolve_walk(&schema, "", 0, &self.components, &self.variant_selection, &mut expanding, self.view_mode);
 
     let blocks = std::mem::take(&mut self.cached_blocks);
     let result = self.render_blocks(&blocks);
@@ -721,7 +734,7 @@ mod tests {
   fn walk(value: serde_json::Value, components: HashMap<String, serde_json::Value>) -> Vec<RenderBlock> {
     let selection = HashMap::new();
     let mut expanding = HashSet::new();
-    resolve_walk(&value, "", 0, &components, &selection, &mut expanding)
+    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml)
   }
 
   #[test]
@@ -942,7 +955,7 @@ mod tests {
     selection.insert("/anyOf".to_string(), 1);
 
     let mut expanding = HashSet::new();
-    let blocks = resolve_walk(&value, "", 0, &HashMap::new(), &selection, &mut expanding);
+    let blocks = resolve_walk(&value, "", 0, &HashMap::new(), &selection, &mut expanding, ViewMode::Yaml);
 
     let v = blocks
       .iter()
@@ -992,7 +1005,7 @@ mod tests {
     let mut walked = 0usize;
     for (name, schema) in &components {
       let mut expanding = HashSet::new();
-      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding);
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
       assert!(
         !blocks.is_empty(),
         "schema `{name}` from {path} produced 0 RenderBlocks (likely a serialization error swallowed somewhere)"
@@ -1108,7 +1121,7 @@ mod tests {
     let abp = components.get("account_business_profile").expect("stripe components.schemas.account_business_profile");
     let selection = HashMap::new();
     let mut expanding = HashSet::new();
-    let blocks = resolve_walk(abp, "", 0, &components, &selection, &mut expanding);
+    let blocks = resolve_walk(abp, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
 
     fn find_variants_with_choice<'a>(blocks: &'a [RenderBlock], choice: &str) -> Option<&'a RenderBlock> {
       for b in blocks {
@@ -1158,7 +1171,7 @@ mod tests {
       let schema = components.get(*name).unwrap_or_else(|| panic!("missing stripe schema `{name}`"));
       let selection = HashMap::new();
       let mut expanding = HashSet::new();
-      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding);
+      let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
       assert!(!blocks.is_empty(), "stripe schema `{name}` produced 0 blocks");
       assert!(expanding.is_empty(), "stripe schema `{name}` left state in expanding: {expanding:?}");
     }
