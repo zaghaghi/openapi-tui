@@ -57,12 +57,18 @@ fn resolve_walk(
   expanding: &mut HashSet<String>,
   view_mode: ViewMode,
 ) -> Vec<RenderBlock> {
-  let _ = view_mode; // dispatched in Task 4
   let node = to_node(value, parent_path, components, variant_selection, expanding);
   let mut blocks = Vec::new();
-  let mut buf = String::new();
-  emit_node(&node, indent, &mut blocks, &mut buf);
-  flush_yaml(indent, &mut buf, &mut blocks);
+  match view_mode {
+    ViewMode::Yaml => {
+      let mut buf = String::new();
+      emit_node(&node, indent, &mut blocks, &mut buf);
+      flush_yaml(indent, &mut buf, &mut blocks);
+    },
+    ViewMode::Annotated => {
+      emit_node_annotated(&node, indent, &mut blocks);
+    },
+  }
   blocks
 }
 
@@ -409,6 +415,225 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
     },
     Node::Composed { body, .. } => node_to_json_lossy(body),
     Node::Variants { body, .. } => node_to_json_lossy(body),
+  }
+}
+
+// ── Annotated emitter ────────────────────────────────────────────────────────
+
+#[allow(dead_code)]
+fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
+  match node {
+    Node::Object(pairs) => emit_object_annotated(pairs, indent, out),
+    // Other arms land in later tasks; for Task 4 we only support a
+    // top-level Object. Anything else falls back to the YAML emit pipeline
+    // (Task 7 will replace this fallback with a more graceful path).
+    _ => {
+      let mut buf = String::new();
+      emit_node(node, indent, out, &mut buf);
+      flush_yaml(indent, &mut buf, out);
+    },
+  }
+}
+
+#[allow(dead_code)]
+fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<RenderBlock>) {
+  // If this Node::Object looks like an OpenAPI schema (has a `properties`
+  // key), render the schema's property children as annotated fields,
+  // drawing `required` from the sibling key at this level.
+  if let Some(Node::Object(props)) = node_get(pairs, "properties") {
+    let required: HashSet<String> =
+      pairs.iter().find_map(|(k, v)| if k == "required" { node_to_string_array(v) } else { None }).unwrap_or_default();
+
+    for (key, child) in props {
+      let block = build_field_block(key, child, indent, &required);
+      out.push(block);
+    }
+    return;
+  }
+
+  // General Object: treat each key/value pair as an annotated field.
+  // Extract the parent's `required` set, if any. Skip the `required` key
+  // itself when iterating fields.
+  let required: HashSet<String> =
+    pairs.iter().find_map(|(k, v)| if k == "required" { node_to_string_array(v) } else { None }).unwrap_or_default();
+
+  for (key, child) in pairs {
+    if key == "required" {
+      continue;
+    }
+    let block = build_field_block(key, child, indent, &required);
+    out.push(block);
+  }
+}
+
+#[allow(dead_code)]
+fn node_to_string_array(node: &Node) -> Option<HashSet<String>> {
+  if let Node::Array(items) = node {
+    let mut set = HashSet::new();
+    for item in items {
+      if let Node::Scalar(serde_json::Value::String(s)) = item {
+        set.insert(s.clone());
+      }
+    }
+    Some(set)
+  } else {
+    None
+  }
+}
+
+#[allow(dead_code)]
+fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<String>) -> RenderBlock {
+  let optional = !required.contains(key);
+  let type_hint = type_hint_str(child);
+  let value = value_str(child);
+  let description = description_first_line(child);
+
+  let mut line = String::new();
+  line.push_str(&" ".repeat(indent));
+  line.push_str(key);
+  if let Some(hint) = &type_hint {
+    line.push_str(&format!(" ({hint})"));
+  }
+  if optional {
+    line.push('?');
+  }
+
+  if let Some(v) = &value {
+    line.push_str(": ");
+    line.push_str(v);
+  } else if let Node::Object(pairs) = child {
+    // Only append ':' for nested object schemas (those with a `properties`
+    // key). Plain type-only schemas like `{ "type": "boolean" }` are leaf
+    // fields and do not need a trailing colon.
+    if node_get(pairs, "properties").is_some() {
+      line.push(':');
+    }
+  }
+
+  if let Some(desc) = &description {
+    line.push_str(&format!("  # {desc}"));
+  }
+
+  let field_line: Vec<(Style, String)> = vec![(Style::default(), line)];
+  let detail = build_detail_line(child, indent);
+  RenderBlock::AnnotatedField { indent, field_line, detail }
+}
+
+#[allow(dead_code)]
+fn type_hint_str(node: &Node) -> Option<String> {
+  let map = match node {
+    Node::Object(pairs) => pairs,
+    _ => return None,
+  };
+  if let Some(t) = node_get_scalar_str(map, "type") {
+    return Some(t.to_string());
+  }
+  if node_get(map, "properties").is_some() {
+    return Some("object".to_string());
+  }
+  None
+}
+
+#[allow(dead_code)]
+fn value_str(node: &Node) -> Option<String> {
+  let map = match node {
+    Node::Object(pairs) => pairs,
+    _ => return None,
+  };
+
+  // example wins over enum
+  if let Some(example) = node_get(map, "example") {
+    return Some(scalar_to_display(example));
+  }
+  if let Some(Node::Array(items)) = node_get(map, "enum") {
+    let parts: Vec<String> = items.iter().map(scalar_to_display).collect();
+    if !parts.is_empty() {
+      return Some(parts.join(" | "));
+    }
+  }
+  None
+}
+
+#[allow(dead_code)]
+fn scalar_to_display(node: &Node) -> String {
+  match node {
+    Node::Scalar(serde_json::Value::String(s)) => format!("\"{}\"", s.replace('"', "\\\"")),
+    Node::Scalar(v) => v.to_string(),
+    _ => serde_json::to_string(&node_to_json_lossy(node)).unwrap_or_default(),
+  }
+}
+
+#[allow(dead_code)]
+fn description_first_line(node: &Node) -> Option<String> {
+  let map = match node {
+    Node::Object(pairs) => pairs,
+    _ => return None,
+  };
+  let desc = node_get_scalar_str(map, "description")?;
+  Some(desc.lines().next().unwrap_or("").to_string())
+}
+
+#[allow(dead_code)]
+fn build_detail_line(node: &Node, indent: usize) -> Option<Vec<(Style, String)>> {
+  let map = match node {
+    Node::Object(pairs) => pairs,
+    _ => return None,
+  };
+
+  let mut parts: Vec<String> = Vec::new();
+  let scalar_keys = [
+    "format",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "default",
+  ];
+  for key in scalar_keys {
+    if let Some(v) = node_get(map, key) {
+      let formatted = match v {
+        // Use bare string values for detail metadata (format, pattern, etc.)
+        // so `format: int64` rather than `format: "int64"`.
+        Node::Scalar(serde_json::Value::String(s)) => format!("{key}: {s}"),
+        Node::Scalar(other) => format!("{key}: {other}"),
+        _ => format!("{key}: {}", serde_json::to_string(&node_to_json_lossy(v)).unwrap_or_default()),
+      };
+      parts.push(formatted);
+    }
+  }
+
+  let bool_flags = ["nullable", "deprecated", "readOnly", "writeOnly", "uniqueItems"];
+  for key in bool_flags {
+    if let Some(Node::Scalar(serde_json::Value::Bool(true))) = node_get(map, key) {
+      parts.push(key.to_string());
+    }
+  }
+
+  if parts.is_empty() {
+    return None;
+  }
+
+  let pad = " ".repeat(indent + 2);
+  let detail_text = format!("{pad}{}", parts.join(", "));
+  let style = Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC).add_modifier(Modifier::DIM);
+  Some(vec![(style, detail_text)])
+}
+
+#[allow(dead_code)]
+fn node_get<'a>(pairs: &'a [(String, Node)], key: &str) -> Option<&'a Node> {
+  pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+}
+
+#[allow(dead_code)]
+fn node_get_scalar_str<'a>(pairs: &'a [(String, Node)], key: &str) -> Option<&'a str> {
+  if let Some(Node::Scalar(serde_json::Value::String(s))) = node_get(pairs, key) {
+    Some(s.as_str())
+  } else {
+    None
   }
 }
 
@@ -1197,6 +1422,61 @@ mod tests {
       let blocks = resolve_walk(schema, "", 0, &components, &selection, &mut expanding, ViewMode::Yaml);
       assert!(!blocks.is_empty(), "stripe schema `{name}` produced 0 blocks");
       assert!(expanding.is_empty(), "stripe schema `{name}` left state in expanding: {expanding:?}");
+    }
+  }
+
+  fn walk_annotated(value: serde_json::Value, components: HashMap<String, serde_json::Value>) -> Vec<RenderBlock> {
+    let selection = HashMap::new();
+    let mut expanding = HashSet::new();
+    resolve_walk(&value, "", 0, &components, &selection, &mut expanding, ViewMode::Annotated)
+  }
+
+  #[test]
+  fn annotated_object_basic_fields() {
+    let value = json!({
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": { "type": "integer", "format": "int64", "example": 10 },
+        "name": { "type": "string", "example": "doggie", "description": "the pet's name" },
+        "active": { "type": "boolean" }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+
+    let field_lines: Vec<String> = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    assert!(field_lines.iter().any(|l: &String| l == "id (integer)?: 10"), "id line missing/wrong: {field_lines:?}");
+    assert!(
+      field_lines.iter().any(|l| l == "name (string): \"doggie\"  # the pet's name"),
+      "name line missing/wrong: {field_lines:?}"
+    );
+    assert!(field_lines.iter().any(|l| l == "active (boolean)?"), "active line missing/wrong: {field_lines:?}");
+
+    // id has format: int64 in detail
+    let id_block = blocks
+      .iter()
+      .find(|b| {
+        matches!(b, RenderBlock::AnnotatedField { field_line, .. }
+          if field_line.iter().any(|(_, t)| t.starts_with("id ")))
+      })
+      .expect("id field present");
+    match id_block {
+      RenderBlock::AnnotatedField { detail, .. } => {
+        let detail = detail.as_ref().expect("id should have a detail line");
+        let detail_text: String = detail.iter().map(|(_, t)| t.as_str()).collect();
+        assert!(detail_text.contains("format: int64"), "detail missing format: {detail_text}");
+      },
+      _ => unreachable!(),
     }
   }
 
