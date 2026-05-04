@@ -445,8 +445,15 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
       pairs.iter().find_map(|(k, v)| if k == "required" { node_to_string_array(v) } else { None }).unwrap_or_default();
 
     for (key, child) in props {
-      let block = build_field_block(key, child, indent, &required);
-      out.push(block);
+      out.push(build_field_block(key, child, indent, &required));
+
+      // Nested object: expand its fields at indent + 2.
+      if let Some(Node::Object(nested_pairs)) = nested_object_schema(child) {
+        emit_object_annotated(nested_pairs, indent + 2, out);
+      } else if let Some(Node::Object(item_pairs)) = array_item_object_schema(child) {
+        // Array of objects: expand the item schema's fields at indent + 2.
+        emit_object_annotated(item_pairs, indent + 2, out);
+      }
     }
     return;
   }
@@ -463,6 +470,48 @@ fn emit_object_annotated(pairs: &[(String, Node)], indent: usize, out: &mut Vec<
     }
     let block = build_field_block(key, child, indent, &required);
     out.push(block);
+  }
+}
+
+/// Return the `child` Node verbatim if it is an OpenAPI object schema
+/// (has a `properties` key) and is NOT an array. The caller passes the
+/// returned Node to `emit_object_annotated`, which drills into it.
+#[allow(dead_code)]
+fn nested_object_schema(child: &Node) -> Option<&Node> {
+  let pairs = match child {
+    Node::Object(p) => p,
+    _ => return None,
+  };
+  if node_get_scalar_str(pairs, "type") == Some("array") {
+    return None;
+  }
+  if node_get(pairs, "properties").is_some() {
+    Some(child)
+  } else {
+    None
+  }
+}
+
+/// If `child` is `{type: array, items: <schema with properties>}`, return
+/// the items Node so the caller can drill into it.
+#[allow(dead_code)]
+fn array_item_object_schema(child: &Node) -> Option<&Node> {
+  let pairs = match child {
+    Node::Object(p) => p,
+    _ => return None,
+  };
+  if node_get_scalar_str(pairs, "type") != Some("array") {
+    return None;
+  }
+  let items = node_get(pairs, "items")?;
+  let item_pairs = match items {
+    Node::Object(p) => p,
+    _ => return None,
+  };
+  if node_get(item_pairs, "properties").is_some() {
+    Some(items)
+  } else {
+    None
   }
 }
 
@@ -487,6 +536,7 @@ fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<
   let type_hint = type_hint_str(child);
   let value = value_str(child);
   let description = description_first_line(child);
+  let expands = nested_object_schema(child).is_some() || array_item_object_schema(child).is_some();
 
   let mut line = String::new();
   line.push_str(&" ".repeat(indent));
@@ -501,13 +551,8 @@ fn build_field_block(key: &str, child: &Node, indent: usize, required: &HashSet<
   if let Some(v) = &value {
     line.push_str(": ");
     line.push_str(v);
-  } else if let Node::Object(pairs) = child {
-    // Only append ':' for nested object schemas (those with a `properties`
-    // key). Plain type-only schemas like `{ "type": "boolean" }` are leaf
-    // fields and do not need a trailing colon.
-    if node_get(pairs, "properties").is_some() {
-      line.push(':');
-    }
+  } else if expands {
+    line.push(':');
   }
 
   if let Some(desc) = &description {
@@ -525,6 +570,16 @@ fn type_hint_str(node: &Node) -> Option<String> {
     Node::Object(pairs) => pairs,
     _ => return None,
   };
+
+  if node_get_scalar_str(map, "type") == Some("array") {
+    if let Some(items) = node_get(map, "items") {
+      if let Some(item_hint) = type_hint_str(items) {
+        return Some(format!("{item_hint}[]"));
+      }
+    }
+    return Some("array".to_string());
+  }
+
   if let Some(t) = node_get_scalar_str(map, "type") {
     return Some(t.to_string());
   }
@@ -1478,6 +1533,69 @@ mod tests {
       },
       _ => unreachable!(),
     }
+  }
+
+  #[test]
+  fn annotated_nested_object_expands_inline() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "example": 1 },
+            "name": { "type": "string", "example": "Dogs" }
+          }
+        }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+    let field_lines: Vec<String> = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    assert!(field_lines.iter().any(|l: &String| l == "category (object)?:"), "category parent line: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "  id (integer)?: 1"), "nested id at indent 2: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "  name (string)?: \"Dogs\""), "nested name at indent 2: {field_lines:?}");
+  }
+
+  #[test]
+  fn annotated_array_type_hints() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "scalars": { "type": "array", "items": { "type": "string" } },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": { "id": { "type": "integer" } }
+          }
+        }
+      }
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+    let field_lines: Vec<String> = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+
+    assert!(field_lines.iter().any(|l: &String| l == "scalars (string[])?"), "string[] hint: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "objects (object[])?:"), "object[] hint with colon: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l == "  id (integer)?"), "object[] expansion: {field_lines:?}");
   }
 
   #[test]
