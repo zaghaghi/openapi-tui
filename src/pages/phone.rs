@@ -181,6 +181,8 @@ impl Page for Phone {
           },
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
+          KeyCode::Char(',') => EventResponse::Stop(Action::PrevVariant),
+          KeyCode::Char('.') => EventResponse::Stop(Action::NextVariant),
           KeyCode::Enter => EventResponse::Stop(Action::Submit),
           KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
           _ => {

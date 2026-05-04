@@ -28,6 +28,8 @@ pub enum Action {
   TabPrev,
   Go,
   Back,
+  PrevVariant,
+  NextVariant,
   ToggleFullScreen,
   StatusLine(String),
   TimedStatusLine(String, u64),

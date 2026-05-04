@@ -158,7 +158,7 @@ impl Pane for ResponsePane {
       },
       Action::Focus => {
         self.focused = true;
-        static STATUS_LINE: &str = "[1-9 → select tab] [g,b → go/back definitions]";
+        static STATUS_LINE: &str = "[1-9 → select tab] [g,b → go/back definitions] [, . → switch variant]";
         return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
       },
       Action::UnFocus => {
@@ -168,6 +168,16 @@ impl Pane for ResponsePane {
       Action::Back => {
         if let Some(response_type) = self.schemas.get(self.schemas_index) {
           self.schema_viewer.back(response_type.schema.clone())?;
+        }
+      },
+      Action::PrevVariant => {
+        if let Some(response_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.prev_variant(&response_type.schema)?;
+        }
+      },
+      Action::NextVariant => {
+        if let Some(response_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.next_variant(&response_type.schema)?;
         }
       },
       _ => {},
