@@ -424,9 +424,24 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
 fn emit_node_annotated(node: &Node, indent: usize, out: &mut Vec<RenderBlock>) {
   match node {
     Node::Object(pairs) => emit_object_annotated(pairs, indent, out),
-    // Other arms land in later tasks; for Task 4 we only support a
-    // top-level Object. Anything else falls back to the YAML emit pipeline
-    // (Task 7 will replace this fallback with a more graceful path).
+    Node::Marker(text) => out.push(RenderBlock::Marker { indent, text: text.clone() }),
+    Node::Composed { leading, body } => {
+      emit_node_annotated(leading, indent, out);
+      emit_node_annotated(body, indent, out);
+    },
+    Node::Variants { id, choices, selected, body } => {
+      let mut body_blocks = Vec::new();
+      emit_node_annotated(body, indent, &mut body_blocks);
+      out.push(RenderBlock::Variants {
+        id: id.clone(),
+        indent,
+        choices: choices.clone(),
+        selected: *selected,
+        body_blocks,
+      });
+    },
+    // Top-level non-object scalars/arrays: fall back to YAML for the root
+    // (full handling lands in Task 7).
     _ => {
       let mut buf = String::new();
       emit_node(node, indent, out, &mut buf);
@@ -1596,6 +1611,75 @@ mod tests {
     assert!(field_lines.iter().any(|l: &String| l == "scalars (string[])?"), "string[] hint: {field_lines:?}");
     assert!(field_lines.iter().any(|l| l == "objects (object[])?:"), "object[] hint with colon: {field_lines:?}");
     assert!(field_lines.iter().any(|l| l == "  id (integer)?"), "object[] expansion: {field_lines:?}");
+  }
+
+  #[test]
+  fn annotated_emit_passes_markers_and_variants() {
+    let mut components = HashMap::new();
+    components.insert("Pet".to_string(), json!({ "type": "object", "properties": { "name": { "type": "string" } } }));
+
+    let value = json!({
+      "allOf": [
+        { "$ref": "#/components/schemas/Pet" },
+        { "type": "object", "properties": { "bark": { "type": "string" } } }
+      ]
+    });
+
+    let blocks = walk_annotated(value, components);
+
+    let has_all_of_marker =
+      blocks.iter().any(|b| matches!(b, RenderBlock::Marker { text, .. } if text == "[All of: Pet, <inline>]"));
+    assert!(has_all_of_marker, "expected [All of: ...] marker among blocks: {blocks:#?}");
+
+    let field_lines: Vec<String> = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(field_lines.iter().any(|l: &String| l.contains("name (string)?")), "merged name: {field_lines:?}");
+    assert!(field_lines.iter().any(|l| l.contains("bark (string)?")), "merged bark: {field_lines:?}");
+  }
+
+  #[test]
+  fn annotated_emit_renders_variants_with_annotated_body() {
+    let value = json!({
+      "anyOf": [
+        { "type": "object", "properties": { "a_field": { "type": "string" } }, "title": "A" },
+        { "type": "object", "properties": { "b_field": { "type": "integer" } }, "title": "B" }
+      ]
+    });
+
+    let blocks = walk_annotated(value, HashMap::new());
+
+    let variants = blocks
+      .iter()
+      .find_map(|b| {
+        match b {
+          RenderBlock::Variants { choices, body_blocks, .. } => Some((choices, body_blocks)),
+          _ => None,
+        }
+      })
+      .expect("expected Variants block");
+    assert_eq!(variants.0, &vec!["A".to_string(), "B".to_string()]);
+
+    let body_field_lines: Vec<String> = variants
+      .1
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(
+      body_field_lines.iter().any(|l: &String| l.contains("a_field (string)?")),
+      "selected variant body: {body_field_lines:?}"
+    );
   }
 
   #[test]
