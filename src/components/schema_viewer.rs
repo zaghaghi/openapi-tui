@@ -46,7 +46,6 @@ pub struct VariantScope {
 
 /// Per-token-role styles for annotated-view rendering, resolved from the
 /// active syntect theme. Built once per `set_styles` call.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct Palette {
   field_name: Style,
@@ -591,38 +590,76 @@ fn build_field_block(
   child: &Node,
   indent: usize,
   required: &HashSet<String>,
-  _palette: &Palette,
+  palette: &Palette,
 ) -> RenderBlock {
-  let optional = !required.contains(key);
-  let type_hint = type_hint_str(child);
-  let value = value_str(child);
-  let description = description_first_line(child);
+  let mut spans: Vec<(Style, String)> = Vec::new();
+
+  if indent > 0 {
+    spans.push((Style::default(), " ".repeat(indent)));
+  }
+  spans.push((palette.field_name, key.to_string()));
+
+  if let Some(hint) = type_hint_str(child) {
+    spans.push((palette.type_paren, " (".to_string()));
+    if let Some(stripped) = hint.strip_suffix("[]") {
+      spans.push((palette.type_name, stripped.to_string()));
+      spans.push((palette.array_brackets, "[]".to_string()));
+    } else {
+      spans.push((palette.type_name, hint));
+    }
+    spans.push((palette.type_paren, ")".to_string()));
+  }
+
+  if !required.contains(key) {
+    spans.push((palette.optional, "?".to_string()));
+  }
+
   let expands = nested_object_schema(child).is_some() || array_item_object_schema(child).is_some();
-
-  let mut line = String::new();
-  line.push_str(&" ".repeat(indent));
-  line.push_str(key);
-  if let Some(hint) = &type_hint {
-    line.push_str(&format!(" ({hint})"));
-  }
-  if optional {
-    line.push('?');
-  }
-
-  if let Some(v) = &value {
-    line.push_str(": ");
-    line.push_str(v);
+  if value_str(child).is_some() {
+    spans.push((palette.colon, ":".to_string()));
+    spans.push((Style::default(), " ".to_string()));
+    push_value_spans(&mut spans, child, palette);
   } else if expands {
-    line.push(':');
+    spans.push((palette.colon, ":".to_string()));
   }
 
-  if let Some(desc) = &description {
-    line.push_str(&format!("  # {desc}"));
+  if let Some(desc) = description_first_line(child) {
+    spans.push((Style::default(), "  ".to_string()));
+    spans.push((palette.description, format!("# {desc}")));
   }
 
-  let field_line: Vec<(Style, String)> = vec![(Style::default(), line)];
   let detail = build_detail_line(child, indent);
-  RenderBlock::AnnotatedField { indent, field_line, detail }
+  RenderBlock::AnnotatedField { indent, field_line: spans, detail }
+}
+
+fn push_value_spans(spans: &mut Vec<(Style, String)>, child: &Node, palette: &Palette) {
+  let pairs = match child {
+    Node::Object(p) => p,
+    _ => return,
+  };
+
+  // example wins over enum, mirroring value_str's precedence.
+  if let Some(example) = node_get(pairs, "example") {
+    spans.push((value_style_for(example, palette), scalar_to_display(example)));
+    return;
+  }
+  if let Some(Node::Array(items)) = node_get(pairs, "enum") {
+    for (i, item) in items.iter().enumerate() {
+      if i > 0 {
+        spans.push((palette.enum_pipe, " | ".to_string()));
+      }
+      spans.push((value_style_for(item, palette), scalar_to_display(item)));
+    }
+  }
+}
+
+fn value_style_for(node: &Node, palette: &Palette) -> Style {
+  match node {
+    Node::Scalar(serde_json::Value::String(_)) => palette.string_value,
+    Node::Scalar(serde_json::Value::Number(_)) => palette.numeric_value,
+    Node::Scalar(serde_json::Value::Bool(_)) | Node::Scalar(serde_json::Value::Null) => palette.boolean_value,
+    _ => Style::default(),
+  }
 }
 
 fn type_hint_str(node: &Node) -> Option<String> {
@@ -1681,7 +1718,7 @@ mod tests {
       .iter()
       .find(|b| {
         matches!(b, RenderBlock::AnnotatedField { field_line, .. }
-          if field_line.iter().any(|(_, t)| t.starts_with("id ")))
+          if field_line.iter().map(|(_, t)| t.as_str()).collect::<String>().starts_with("id "))
       })
       .expect("id field present");
     match id_block {
@@ -1940,5 +1977,121 @@ mod tests {
       viewer.line_offset,
       new_max
     );
+  }
+
+  fn first_annotated_field(blocks: &[RenderBlock], key_predicate: impl Fn(&str) -> bool) -> &Vec<(Style, String)> {
+    for b in blocks {
+      if let RenderBlock::AnnotatedField { field_line, .. } = b {
+        if field_line.iter().any(|(_, t)| key_predicate(t.as_str())) {
+          return field_line;
+        }
+      }
+    }
+    panic!("no AnnotatedField matched predicate; blocks: {blocks:#?}")
+  }
+
+  #[test]
+  fn highlighting_field_name_has_color() {
+    let value = json!({
+      "type": "object",
+      "properties": { "name": { "type": "string" } }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "name");
+    let name_span = line.iter().find(|(_, t)| t == "name").expect("name span");
+    assert!(name_span.0.fg.is_some(), "field name should have a foreground color");
+  }
+
+  #[test]
+  fn highlighting_type_name_distinct_from_field_name() {
+    let value = json!({
+      "type": "object",
+      "properties": { "name": { "type": "string" } }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "name");
+    let name_fg = line.iter().find(|(_, t)| t == "name").expect("name span").0.fg;
+    let type_fg = line.iter().find(|(_, t)| t == "string").expect("type span").0.fg;
+    assert!(name_fg.is_some() && type_fg.is_some(), "both should be colored");
+    assert_ne!(name_fg, type_fg, "field name and type name should have distinct colors");
+  }
+
+  #[test]
+  fn highlighting_string_vs_numeric_value_styling_differ() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "example": "doggie" },
+        "id": { "type": "integer", "example": 10 }
+      }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+
+    let name_line = first_annotated_field(&blocks, |t| t == "name");
+    let id_line = first_annotated_field(&blocks, |t| t == "id");
+
+    let string_value_fg = name_line.iter().find(|(_, t)| t == "\"doggie\"").expect("string value span").0.fg;
+    let numeric_value_fg = id_line.iter().find(|(_, t)| t == "10").expect("numeric value span").0.fg;
+
+    assert!(string_value_fg.is_some() && numeric_value_fg.is_some(), "both should be colored");
+    assert_ne!(string_value_fg, numeric_value_fg, "string and numeric values should have distinct colors");
+  }
+
+  #[test]
+  fn highlighting_array_brackets_distinct_from_type_name() {
+    let value = json!({
+      "type": "object",
+      "properties": { "tags": { "type": "array", "items": { "type": "string" } } }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "tags");
+    let type_fg = line.iter().find(|(_, t)| t == "string").expect("type span").0.fg;
+    let brackets_fg = line.iter().find(|(_, t)| t == "[]").expect("brackets span").0.fg;
+    assert!(type_fg.is_some() && brackets_fg.is_some(), "both should be colored");
+    assert_ne!(type_fg, brackets_fg, "type name and array brackets should have distinct colors");
+  }
+
+  #[test]
+  fn highlighting_enum_pipe_distinct_from_string_value() {
+    let value = json!({
+      "type": "object",
+      "properties": { "status": { "type": "string", "enum": ["a", "b"] } }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "status");
+    let value_fg = line.iter().find(|(_, t)| t == "\"a\"").expect("string enum value span").0.fg;
+    let pipe_fg = line.iter().find(|(_, t)| t.contains('|')).expect("pipe span").0.fg;
+    assert_ne!(value_fg, pipe_fg, "enum value and pipe should have distinct colors");
+  }
+
+  #[test]
+  fn highlighting_description_span_is_styled() {
+    let value = json!({
+      "type": "object",
+      "properties": { "name": { "type": "string", "description": "the name" } }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "name");
+    let desc_span = line.iter().find(|(_, t)| t.starts_with("# ")).expect("description span");
+    let has_italic = desc_span.0.add_modifier.contains(Modifier::ITALIC);
+    let has_color = desc_span.0.fg.is_some();
+    assert!(has_italic || has_color, "description should be italic or colored: {:?}", desc_span.0);
+  }
+
+  #[test]
+  fn highlighting_whitespace_spans_default_styled() {
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "object",
+          "properties": { "id": { "type": "integer", "example": 1 } }
+        }
+      }
+    });
+    let blocks = walk_annotated(value, HashMap::new());
+    let line = first_annotated_field(&blocks, |t| t == "id");
+    let indent_span = line.iter().find(|(_, t)| t == "  ").expect("indent span");
+    assert!(indent_span.0.fg.is_none(), "indent whitespace should not be colored");
   }
 }
