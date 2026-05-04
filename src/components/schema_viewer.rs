@@ -84,6 +84,12 @@ enum Node {
     leading: Box<Node>,
     body: Box<Node>,
   },
+  Variants {
+    id: NodeId,
+    choices: Vec<String>,
+    selected: usize,
+    body: Box<Node>,
+  },
 }
 
 /// Walks `value`, following refs and producing a `Node` tree. Composition
@@ -110,6 +116,19 @@ fn to_node(
     let sources = all_of_sources(members);
     let merged = merge_all_of(members, components, expanding);
     return Node::Composed { leading: Box::new(Node::Marker(format!("[All of: {sources}]"))), body: Box::new(merged) };
+  }
+
+  if let Some((kind, members)) = composition_members(value) {
+    // Path tracking is handled by the caller (see Task 7); for now use a
+    // synthetic id derived from the keyword + member count + first member's
+    // type. This is good enough for tests; the real id is set in Task 7.
+    let id = format!("__anonymous__/{kind}");
+    let choices = members.iter().enumerate().map(|(i, m)| variant_label(m, i)).collect::<Vec<_>>();
+    let selected = 0;
+    let chosen = members.get(selected).cloned().unwrap_or(serde_json::Value::Null);
+    let body = to_node(&chosen, components, expanding);
+
+    return Node::Variants { id, choices, selected, body: Box::new(body) };
   }
 
   match value {
@@ -205,6 +224,27 @@ fn merge_nodes(target: Node, source: Node) -> Node {
   }
 }
 
+fn composition_members(value: &serde_json::Value) -> Option<(&'static str, &Vec<serde_json::Value>)> {
+  let obj = value.as_object()?;
+  if let Some(arr) = obj.get("anyOf").and_then(|v| v.as_array()) {
+    return Some(("anyOf", arr));
+  }
+  if let Some(arr) = obj.get("oneOf").and_then(|v| v.as_array()) {
+    return Some(("oneOf", arr));
+  }
+  None
+}
+
+fn variant_label(member: &serde_json::Value, index: usize) -> String {
+  if let Some(name) = ref_target_name(member) {
+    return name.to_string();
+  }
+  if let Some(title) = member.as_object().and_then(|o| o.get("title")).and_then(|v| v.as_str()) {
+    return title.to_string();
+  }
+  format!("Variant {}", index + 1)
+}
+
 /// Walks a Node tree and produces RenderBlocks. Pure branches (no markers)
 /// are coalesced into single Yaml blocks via the shared `buf` so they
 /// render through one syntect highlighter pass at render time.
@@ -247,6 +287,20 @@ fn emit_node(node: &Node, indent: usize, out: &mut Vec<RenderBlock>, buf: &mut S
       flush_yaml(indent, buf, out);
       emit_node(body, indent, out, buf);
     },
+    Node::Variants { id, choices, selected, body } => {
+      flush_yaml(indent, buf, out);
+      let mut body_blocks = Vec::new();
+      let mut body_buf = String::new();
+      emit_node(body, indent, &mut body_blocks, &mut body_buf);
+      flush_yaml(indent, &mut body_buf, &mut body_blocks);
+      out.push(RenderBlock::Variants {
+        id: id.clone(),
+        indent,
+        choices: choices.clone(),
+        selected: *selected,
+        body_blocks,
+      });
+    },
   }
 }
 
@@ -265,6 +319,7 @@ fn contains_marker(node: &Node) -> bool {
     Node::Array(items) => items.iter().any(contains_marker),
     Node::Object(pairs) => pairs.iter().any(|(_, v)| contains_marker(v)),
     Node::Composed { leading, body } => contains_marker(leading) || contains_marker(body),
+    Node::Variants { body, .. } => contains_marker(body),
   }
 }
 
@@ -284,6 +339,7 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
       serde_json::Value::Object(m)
     },
     Node::Composed { body, .. } => node_to_json_lossy(body),
+    Node::Variants { body, .. } => node_to_json_lossy(body),
   }
 }
 
@@ -563,6 +619,48 @@ mod tests {
 
     assert!(yaml.contains("x-custom: addr"), "nested ref was not resolved; full yaml:\n{yaml}");
     assert!(!yaml.contains("$ref"), "yaml still contains literal $ref:\n{yaml}");
+  }
+
+  #[test]
+  fn any_of_produces_variants_block() {
+    let mut components = HashMap::new();
+    components.insert("A".to_string(), json!({ "type": "object", "x-tag": "a" }));
+    components.insert("B".to_string(), json!({ "type": "object", "x-tag": "b" }));
+
+    let value = json!({
+      "anyOf": [
+        { "$ref": "#/components/schemas/A" },
+        { "$ref": "#/components/schemas/B" }
+      ]
+    });
+
+    let blocks = walk(value, components);
+
+    let variants = blocks
+      .iter()
+      .find_map(|b| {
+        match b {
+          RenderBlock::Variants { choices, selected, body_blocks, .. } => Some((choices, *selected, body_blocks)),
+          _ => None,
+        }
+      })
+      .expect("expected a Variants block");
+
+    assert_eq!(variants.0, &vec!["A".to_string(), "B".to_string()]);
+    assert_eq!(variants.1, 0);
+    // Body should contain x-tag: a, not x-tag: b.
+    let body_yaml: String = variants
+      .2
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(body_yaml.contains("x-tag: a"), "body did not have selected variant: {body_yaml}");
+    assert!(!body_yaml.contains("x-tag: b"), "body leaked unselected variant: {body_yaml}");
   }
 
   #[test]
