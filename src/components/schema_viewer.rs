@@ -77,6 +77,13 @@ enum Node {
   Object(Vec<(String, Node)>),
   Array(Vec<Node>),
   Marker(String),
+  /// A node that emits a leading block, then a body. Used to attach
+  /// `[All of: ...]` markers to merged objects without polluting the
+  /// object's key namespace.
+  Composed {
+    leading: Box<Node>,
+    body: Box<Node>,
+  },
 }
 
 /// Walks `value`, following refs and producing a `Node` tree. Composition
@@ -99,6 +106,12 @@ fn to_node(
     }
   }
 
+  if let Some(members) = all_of_members(value) {
+    let sources = all_of_sources(members);
+    let merged = merge_all_of(members, components, expanding);
+    return Node::Composed { leading: Box::new(Node::Marker(format!("[All of: {sources}]"))), body: Box::new(merged) };
+  }
+
   match value {
     serde_json::Value::Object(map) => {
       let mut pairs = Vec::with_capacity(map.len());
@@ -109,6 +122,86 @@ fn to_node(
     },
     serde_json::Value::Array(items) => Node::Array(items.iter().map(|v| to_node(v, components, expanding)).collect()),
     _ => Node::Scalar(value.clone()),
+  }
+}
+
+fn all_of_members(value: &serde_json::Value) -> Option<&Vec<serde_json::Value>> {
+  value.as_object()?.get("allOf")?.as_array()
+}
+
+fn all_of_sources(members: &[serde_json::Value]) -> String {
+  members
+    .iter()
+    .map(|m| {
+      match ref_target_name(m) {
+        Some(name) => name.to_string(),
+        None => "<inline>".to_string(),
+      }
+    })
+    .collect::<Vec<_>>()
+    .join(", ")
+}
+
+fn merge_all_of(
+  members: &[serde_json::Value],
+  components: &HashMap<String, serde_json::Value>,
+  expanding: &mut HashSet<String>,
+) -> Node {
+  let mut acc: Vec<(String, Node)> = Vec::new();
+  let mut seen_keys: HashMap<String, usize> = HashMap::new();
+  for member in members {
+    let resolved = to_node(member, components, expanding);
+    if let Node::Object(pairs) = resolved {
+      for (k, v) in pairs {
+        if k == "allOf" {
+          continue; // already merged
+        }
+        if let Some(&idx) = seen_keys.get(&k) {
+          // Deep-merge two Object children (keeps properties/etc. from
+          // earlier members instead of clobbering them); later wins on
+          // scalars; arrays concat with simple dedupe.
+          let prev = std::mem::replace(&mut acc[idx].1, Node::Scalar(serde_json::Value::Null));
+          acc[idx].1 = merge_nodes(prev, v);
+        } else {
+          seen_keys.insert(k.clone(), acc.len());
+          acc.push((k, v));
+        }
+      }
+    } else if let Node::Marker(t) = resolved {
+      acc.push((format!("__marker_{}", acc.len()), Node::Marker(t)));
+    }
+    // Scalars/arrays at allOf member top level are not meaningful; ignore.
+  }
+  Node::Object(acc)
+}
+
+/// Deep-merge two Nodes. Object + Object recurses by key. Array + Array
+/// concatenates with naive (JSON-equality) dedupe. Anything else: source
+/// wins (the later allOf member overrides).
+fn merge_nodes(target: Node, source: Node) -> Node {
+  match (target, source) {
+    (Node::Object(mut t), Node::Object(s)) => {
+      for (k, v) in s {
+        if let Some(pos) = t.iter().position(|(tk, _)| tk == &k) {
+          let existing = std::mem::replace(&mut t[pos].1, Node::Scalar(serde_json::Value::Null));
+          t[pos].1 = merge_nodes(existing, v);
+        } else {
+          t.push((k, v));
+        }
+      }
+      Node::Object(t)
+    },
+    (Node::Array(mut t), Node::Array(s)) => {
+      for item in s {
+        let key = serde_json::to_string(&node_to_json_lossy(&item)).unwrap_or_default();
+        let already = t.iter().any(|e| serde_json::to_string(&node_to_json_lossy(e)).unwrap_or_default() == key);
+        if !already {
+          t.push(item);
+        }
+      }
+      Node::Array(t)
+    },
+    (_, source) => source,
   }
 }
 
@@ -149,6 +242,11 @@ fn emit_node(node: &Node, indent: usize, out: &mut Vec<RenderBlock>, buf: &mut S
         }
       }
     },
+    Node::Composed { leading, body } => {
+      emit_node(leading, indent, out, buf);
+      flush_yaml(indent, buf, out);
+      emit_node(body, indent, out, buf);
+    },
   }
 }
 
@@ -166,6 +264,7 @@ fn contains_marker(node: &Node) -> bool {
     Node::Scalar(_) => false,
     Node::Array(items) => items.iter().any(contains_marker),
     Node::Object(pairs) => pairs.iter().any(|(_, v)| contains_marker(v)),
+    Node::Composed { leading, body } => contains_marker(leading) || contains_marker(body),
   }
 }
 
@@ -184,6 +283,7 @@ fn node_to_json_lossy(node: &Node) -> serde_json::Value {
       }
       serde_json::Value::Object(m)
     },
+    Node::Composed { body, .. } => node_to_json_lossy(body),
   }
 }
 
@@ -463,5 +563,40 @@ mod tests {
 
     assert!(yaml.contains("x-custom: addr"), "nested ref was not resolved; full yaml:\n{yaml}");
     assert!(!yaml.contains("$ref"), "yaml still contains literal $ref:\n{yaml}");
+  }
+
+  #[test]
+  fn all_of_emits_marker_and_merged_yaml() {
+    let mut components = HashMap::new();
+    components.insert("Pet".to_string(), json!({ "type": "object", "properties": { "name": { "type": "string" } } }));
+
+    let value = json!({
+      "allOf": [
+        { "$ref": "#/components/schemas/Pet" },
+        { "type": "object", "properties": { "bark": { "type": "string" } } }
+      ]
+    });
+
+    let blocks = walk(value, components);
+
+    // Find the marker
+    let marker_idx = blocks
+      .iter()
+      .position(|b| matches!(b, RenderBlock::Marker { text, .. } if text == "[All of: Pet, <inline>]"))
+      .expect("missing [All of: Pet, <inline>] marker");
+    // After the marker, there should be at least one Yaml block containing
+    // both "name" and "bark" properties.
+    let after_yaml: String = blocks
+      .iter()
+      .skip(marker_idx + 1)
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect();
+    assert!(after_yaml.contains("name:"), "merged yaml missing 'name': {after_yaml}");
+    assert!(after_yaml.contains("bark:"), "merged yaml missing 'bark': {after_yaml}");
   }
 }
