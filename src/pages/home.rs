@@ -174,6 +174,7 @@ impl Page for Home {
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
           KeyCode::Char(',') => EventResponse::Stop(Action::PrevVariant),
           KeyCode::Char('.') => EventResponse::Stop(Action::NextVariant),
+          KeyCode::Char('a') | KeyCode::Char('A') => EventResponse::Stop(Action::ToggleSchemaView),
           KeyCode::Char('/') => EventResponse::Stop(Action::FocusFooter("/".into(), Some(state.active_filter.clone()))),
           KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
           _ => {

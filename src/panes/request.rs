@@ -176,7 +176,8 @@ impl Pane for RequestPane {
       },
       Action::Focus => {
         self.focused = true;
-        static STATUS_LINE: &str = "[1-9 → select tab] [g,b → go/back definitions] [, . → switch variant]";
+        static STATUS_LINE: &str =
+          "[1-9 → select tab] [g,b → go/back definitions] [, . → switch variant] [a → toggle annotated/YAML]";
         return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
       },
       Action::UnFocus => {
@@ -196,6 +197,11 @@ impl Pane for RequestPane {
       Action::NextVariant => {
         if let Some(request_type) = self.schemas.get(self.schemas_index) {
           self.schema_viewer.next_variant(&request_type.schema)?;
+        }
+      },
+      Action::ToggleSchemaView => {
+        if let Some(request_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.toggle_view(&request_type.schema)?;
         }
       },
       _ => {},

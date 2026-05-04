@@ -30,6 +30,7 @@ pub enum Action {
   Back,
   PrevVariant,
   NextVariant,
+  ToggleSchemaView,
   ToggleFullScreen,
   StatusLine(String),
   TimedStatusLine(String, u64),
