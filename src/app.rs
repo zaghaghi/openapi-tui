@@ -94,16 +94,18 @@ impl App {
           .popup
           .as_mut()
           .and_then(|pane| pane.handle_events(e.clone(), &mut self.state).ok())
-          .map(|response| match response {
-            Some(tui::EventResponse::Continue(action)) => {
-              action_tx.send(action).ok();
-              false
-            },
-            Some(tui::EventResponse::Stop(action)) => {
-              action_tx.send(action).ok();
-              true
-            },
-            _ => false,
+          .map(|response| {
+            match response {
+              Some(tui::EventResponse::Continue(action)) => {
+                action_tx.send(action).ok();
+                false
+              },
+              Some(tui::EventResponse::Stop(action)) => {
+                action_tx.send(action).ok();
+                true
+              },
+              _ => false,
+            }
           })
           .unwrap_or(false);
         stop_event_propagation = stop_event_propagation
@@ -111,16 +113,18 @@ impl App {
             .pages
             .get_mut(self.active_page)
             .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
-            .map(|response| match response {
-              Some(tui::EventResponse::Continue(action)) => {
-                action_tx.send(action).ok();
-                false
-              },
-              Some(tui::EventResponse::Stop(action)) => {
-                action_tx.send(action).ok();
-                true
-              },
-              _ => false,
+            .map(|response| {
+              match response {
+                Some(tui::EventResponse::Continue(action)) => {
+                  action_tx.send(action).ok();
+                  false
+                },
+                Some(tui::EventResponse::Stop(action)) => {
+                  action_tx.send(action).ok();
+                  true
+                },
+                _ => false,
+              }
             })
             .unwrap_or(false);
 
@@ -128,16 +132,18 @@ impl App {
           || self
             .footer
             .handle_events(e.clone(), &mut self.state)
-            .map(|response| match response {
-              Some(tui::EventResponse::Continue(action)) => {
-                action_tx.send(action).ok();
-                false
-              },
-              Some(tui::EventResponse::Stop(action)) => {
-                action_tx.send(action).ok();
-                true
-              },
-              _ => false,
+            .map(|response| {
+              match response {
+                Some(tui::EventResponse::Continue(action)) => {
+                  action_tx.send(action).ok();
+                  false
+                },
+                Some(tui::EventResponse::Stop(action)) => {
+                  action_tx.send(action).ok();
+                  true
+                },
+                _ => false,
+              }
             })
             .unwrap_or(false);
 
@@ -218,16 +224,15 @@ impl App {
             }
             action_tx.send(Action::CloseHistory).unwrap();
           },
-          Action::HangUp(ref operation_id) => {
-            if self.pages.len() > 1 {
-              self.pages[0].unfocus()?;
-              let page = self.pages.remove(0);
-              self.pages[0].focus()?;
-              if let Some(operation_id) = operation_id {
-                self.history.insert(operation_id.clone(), page);
-              }
+          Action::HangUp(ref operation_id) if self.pages.len() > 1 => {
+            self.pages[0].unfocus()?;
+            let page = self.pages.remove(0);
+            self.pages[0].focus()?;
+            if let Some(operation_id) = operation_id {
+              self.history.insert(operation_id.clone(), page);
             }
           },
+          Action::HangUp(_) => {},
           Action::History => {
             let operation_ids = self
               .state
@@ -242,9 +247,7 @@ impl App {
             self.popup = Some(Box::new(history_popup));
           },
           Action::CloseHistory => {
-            if self.popup.is_some() {
-              self.popup = None;
-            }
+            self.popup = None;
           },
           _ => {},
         }

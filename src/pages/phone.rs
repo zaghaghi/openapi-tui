@@ -42,6 +42,11 @@ pub trait RequestBuilder {
 pub trait RequestPane: Pane + RequestBuilder {}
 
 impl Phone {
+  fn default_status_line() -> String {
+    const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
+    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]")
+  }
+
   pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>, _state: &State) -> Result<Self> {
     let focused_border_style = Style::default().fg(Color::LightGreen);
     let operation_item = Arc::new(operation_item);
@@ -147,11 +152,7 @@ impl Page for Phone {
 
   fn focus(&mut self) -> Result<()> {
     if let Some(command_tx) = &self.command_tx {
-      const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-      let status_line = format!(
-        "[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]"
-      );
-      command_tx.send(Action::StatusLine(status_line))?;
+      command_tx.send(Action::StatusLine(Self::default_status_line()))?;
     }
     Ok(())
   }
@@ -181,6 +182,9 @@ impl Page for Phone {
           },
           KeyCode::Char(']') => EventResponse::Stop(Action::TabNext),
           KeyCode::Char('[') => EventResponse::Stop(Action::TabPrev),
+          KeyCode::Char(',') => EventResponse::Stop(Action::PrevVariant),
+          KeyCode::Char('.') => EventResponse::Stop(Action::NextVariant),
+          KeyCode::Char('a') | KeyCode::Char('A') => EventResponse::Stop(Action::ToggleSchemaView),
           KeyCode::Enter => EventResponse::Stop(Action::Submit),
           KeyCode::Char(':') => EventResponse::Stop(Action::FocusFooter(":".into(), None)),
           _ => {
@@ -210,6 +214,7 @@ impl Page for Phone {
           actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = next_index;
+        actions.push(Some(Action::StatusLine(Self::default_status_line())));
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           actions.push(pane.update(Action::Focus, state)?);
         }
@@ -220,6 +225,7 @@ impl Page for Phone {
           actions.push(pane.update(Action::UnFocus, state)?);
         }
         self.focused_pane_index = prev_index;
+        actions.push(Some(Action::StatusLine(Self::default_status_line())));
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
           actions.push(pane.update(Action::Focus, state)?);
         }

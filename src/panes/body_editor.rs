@@ -49,7 +49,8 @@ impl BodyEditor<'_> {
   }
 }
 
-impl RequestPane for BodyEditor<'_> {}
+impl RequestPane for BodyEditor<'_> {
+}
 
 impl RequestBuilder for BodyEditor<'_> {
   fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -88,12 +89,14 @@ impl Pane for BodyEditor<'_> {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => match key.code {
-        KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
-        _ => {
-          self.input.input(key);
-          Ok(Some(EventResponse::Stop(Action::Noop)))
-        },
+      InputMode::Insert => {
+        match key.code {
+          KeyCode::Esc => Ok(Some(EventResponse::Stop(Action::Submit))),
+          _ => {
+            self.input.input(key);
+            Ok(Some(EventResponse::Stop(Action::Noop)))
+          },
+        }
       },
       _ => Ok(None),
     }

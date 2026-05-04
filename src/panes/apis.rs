@@ -74,7 +74,7 @@ impl Pane for ApisPane {
       Action::Focus => {
         self.focused = true;
         static STATUS_LINE: &str = "[j,k → movement] [ENTER → request]";
-        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+        return Ok(Some(Action::StatusLine(STATUS_LINE.into())));
       },
       Action::UnFocus => {
         self.focused = false;
@@ -101,13 +101,10 @@ impl Pane for ApisPane {
       }
       Some(Line::from(vec![
         Span::styled(
-          format!(
-            " {:7}",
-            match operation_item.r#type {
-              OperationItemType::Path => operation_item.method.as_str(),
-              OperationItemType::Webhook => "EVENT",
-            }
-          ),
+          format!(" {:7}", match operation_item.r#type {
+            OperationItemType::Path => operation_item.method.as_str(),
+            OperationItemType::Webhook => "EVENT",
+          }),
           match operation_item.r#type {
             OperationItemType::Path => Self::method_color(operation_item.method.as_str()),
             OperationItemType::Webhook => Color::LightMagenta,
