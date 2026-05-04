@@ -45,24 +45,12 @@ fn resolve_walk(
   _variant_selection: &HashMap<NodeId, usize>,
   expanding: &mut HashSet<String>,
 ) -> Vec<RenderBlock> {
-  if let Some(name) = ref_target_name(value) {
-    if expanding.contains(name) {
-      return vec![RenderBlock::Marker { indent, text: format!("[Recursive {name}]") }];
-    }
-    if let Some(target) = components.get(name) {
-      expanding.insert(name.to_string());
-      let blocks = resolve_walk(target, _parent_path, indent, components, _variant_selection, expanding);
-      expanding.remove(name);
-      return blocks;
-    }
-    // Unknown component: fall through and emit the literal $ref.
-  }
-
-  let yaml = match serde_yaml::to_string(value) {
-    Ok(s) => s,
-    Err(_) => return Vec::new(),
-  };
-  vec![RenderBlock::Yaml(indent_lines(&yaml, indent))]
+  let node = to_node(value, components, expanding);
+  let mut blocks = Vec::new();
+  let mut buf = String::new();
+  emit_node(&node, indent, &mut blocks, &mut buf);
+  flush_yaml(indent, &mut buf, &mut blocks);
+  blocks
 }
 
 /// Returns the bare component name if `value` is exactly `{"$ref":
@@ -76,6 +64,127 @@ fn ref_target_name(value: &serde_json::Value) -> Option<&str> {
   }
   let s = obj.get("$ref")?.as_str()?;
   s.strip_prefix("#/components/schemas/")
+}
+
+/// Intermediate tree built from the source schema with refs resolved and
+/// composition keywords replaced by sentinel nodes. We do not stuff Markers
+/// or Variants into `serde_json::Value` because they cannot be rendered as
+/// valid YAML; instead we keep our own enum and emit YAML for the plain
+/// branches piecewise.
+#[derive(Debug, Clone)]
+enum Node {
+  Scalar(serde_json::Value),
+  Object(Vec<(String, Node)>),
+  Array(Vec<Node>),
+  Marker(String),
+}
+
+/// Walks `value`, following refs and producing a `Node` tree. Composition
+/// (`allOf` / `anyOf` / `oneOf`) is handled in later tasks; for now a
+/// composition keyword is treated as an ordinary object key.
+fn to_node(
+  value: &serde_json::Value,
+  components: &HashMap<String, serde_json::Value>,
+  expanding: &mut HashSet<String>,
+) -> Node {
+  if let Some(name) = ref_target_name(value) {
+    if expanding.contains(name) {
+      return Node::Marker(format!("[Recursive {name}]"));
+    }
+    if let Some(target) = components.get(name) {
+      expanding.insert(name.to_string());
+      let node = to_node(target, components, expanding);
+      expanding.remove(name);
+      return node;
+    }
+  }
+
+  match value {
+    serde_json::Value::Object(map) => {
+      let mut pairs = Vec::with_capacity(map.len());
+      for (k, v) in map {
+        pairs.push((k.clone(), to_node(v, components, expanding)));
+      }
+      Node::Object(pairs)
+    },
+    serde_json::Value::Array(items) => Node::Array(items.iter().map(|v| to_node(v, components, expanding)).collect()),
+    _ => Node::Scalar(value.clone()),
+  }
+}
+
+/// Walks a Node tree and produces RenderBlocks. Pure branches (no markers)
+/// are coalesced into single Yaml blocks via the shared `buf` so they
+/// render through one syntect highlighter pass at render time.
+fn emit_node(node: &Node, indent: usize, out: &mut Vec<RenderBlock>, buf: &mut String) {
+  match node {
+    Node::Marker(text) => {
+      flush_yaml(indent, buf, out);
+      out.push(RenderBlock::Marker { indent, text: text.clone() });
+    },
+    Node::Scalar(_) | Node::Array(_) => {
+      // A bare scalar or array at this entry point is unusual — schemas are
+      // objects in practice. Render via the lossy JSON view.
+      let json = node_to_json_lossy(node);
+      if let Ok(yaml) = serde_yaml::to_string(&json) {
+        buf.push_str(&yaml);
+      }
+    },
+    Node::Object(pairs) => {
+      for (key, value) in pairs {
+        if contains_marker(value) {
+          flush_yaml(indent, buf, out);
+          // Emit the key line on its own (already indented for the Yaml block).
+          out.push(RenderBlock::Yaml(format!("{}{key}:\n", " ".repeat(indent))));
+          // Recurse into the value at indent + 2.
+          emit_node(value, indent + 2, out, buf);
+          flush_yaml(indent + 2, buf, out);
+        } else {
+          // Pure subtree — serialize the {key: value} pair as YAML and
+          // append. Trailing newline from serde_yaml is preserved.
+          let mut one = serde_json::Map::new();
+          one.insert(key.clone(), node_to_json_lossy(value));
+          if let Ok(yaml) = serde_yaml::to_string(&serde_json::Value::Object(one)) {
+            buf.push_str(&yaml);
+          }
+        }
+      }
+    },
+  }
+}
+
+fn flush_yaml(indent: usize, buf: &mut String, out: &mut Vec<RenderBlock>) {
+  if buf.is_empty() {
+    return;
+  }
+  let text = std::mem::take(buf);
+  out.push(RenderBlock::Yaml(indent_lines(&text, indent)));
+}
+
+fn contains_marker(node: &Node) -> bool {
+  match node {
+    Node::Marker(_) => true,
+    Node::Scalar(_) => false,
+    Node::Array(items) => items.iter().any(contains_marker),
+    Node::Object(pairs) => pairs.iter().any(|(_, v)| contains_marker(v)),
+  }
+}
+
+/// Lossy JSON view of a Node: Markers become string literals. Only called
+/// from branches where `contains_marker` returned false, so the lossiness
+/// is unreachable in practice.
+fn node_to_json_lossy(node: &Node) -> serde_json::Value {
+  match node {
+    Node::Marker(t) => serde_json::Value::String(t.clone()),
+    Node::Scalar(v) => v.clone(),
+    Node::Array(items) => serde_json::Value::Array(items.iter().map(node_to_json_lossy).collect()),
+    Node::Object(pairs) => {
+      let mut m = serde_json::Map::new();
+      for (k, v) in pairs {
+        m.insert(k.clone(), node_to_json_lossy(v));
+      }
+      serde_json::Value::Object(m)
+    },
+  }
 }
 
 /// Prepend `n` spaces to each non-empty line.
@@ -326,5 +435,33 @@ mod tests {
       RenderBlock::Marker { text, indent: _ } => assert_eq!(text, "[Recursive Loop]"),
       other => panic!("expected Marker, got {other:?}"),
     }
+  }
+
+  #[test]
+  fn nested_ref_inside_properties_is_resolved() {
+    let mut components = HashMap::new();
+    components.insert("Address".to_string(), json!({ "type": "object", "x-custom": "addr" }));
+
+    let value = json!({
+      "type": "object",
+      "properties": {
+        "address": { "$ref": "#/components/schemas/Address" },
+      },
+    });
+
+    let blocks = walk(value, components);
+
+    let yaml = blocks
+      .iter()
+      .filter_map(|b| {
+        match b {
+          RenderBlock::Yaml(s) => Some(s.as_str()),
+          _ => None,
+        }
+      })
+      .collect::<String>();
+
+    assert!(yaml.contains("x-custom: addr"), "nested ref was not resolved; full yaml:\n{yaml}");
+    assert!(!yaml.contains("$ref"), "yaml still contains literal $ref:\n{yaml}");
   }
 }
