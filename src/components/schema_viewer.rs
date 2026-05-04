@@ -46,6 +46,9 @@ fn resolve_walk(
   expanding: &mut HashSet<String>,
 ) -> Vec<RenderBlock> {
   if let Some(name) = ref_target_name(value) {
+    if expanding.contains(name) {
+      return vec![RenderBlock::Marker { indent, text: format!("[Recursive {name}]") }];
+    }
     if let Some(target) = components.get(name) {
       expanding.insert(name.to_string());
       let blocks = resolve_walk(target, _parent_path, indent, components, _variant_selection, expanding);
@@ -308,6 +311,20 @@ mod tests {
         assert!(!s.contains("$ref"), "resolved output should not contain $ref");
       },
       other => panic!("expected Yaml, got {other:?}"),
+    }
+  }
+
+  #[test]
+  fn recursive_ref_emits_marker() {
+    let mut components = HashMap::new();
+    components.insert("Loop".to_string(), json!({ "$ref": "#/components/schemas/Loop" }));
+
+    let blocks = walk(json!({ "$ref": "#/components/schemas/Loop" }), components);
+
+    assert_eq!(blocks.len(), 1, "expected exactly one block: {blocks:#?}");
+    match &blocks[0] {
+      RenderBlock::Marker { text, indent: _ } => assert_eq!(text, "[Recursive Loop]"),
+      other => panic!("expected Marker, got {other:?}"),
     }
   }
 }
