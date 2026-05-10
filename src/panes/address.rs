@@ -108,7 +108,7 @@ impl Pane for AddressPane {
               Style::default().fg(Self::method_color(operation_item.method.as_str())),
             ),
             Span::styled(base_url, Style::default().fg(Color::DarkGray)),
-            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            Span::raw(&operation_item.path),
           ])),
           OperationItemType::Webhook => Paragraph::new(Line::from(vec![
             Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
@@ -116,7 +116,7 @@ impl Pane for AddressPane {
               format!("{} ", operation_item.method.as_str()),
               Style::default().fg(Self::method_color(operation_item.method.as_str())),
             ),
-            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            Span::raw(&operation_item.path),
           ])),
         },
         inner,

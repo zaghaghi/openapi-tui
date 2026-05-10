@@ -113,7 +113,7 @@ impl Pane for ApisPane {
             OperationItemType::Webhook => Color::LightMagenta,
           },
         ),
-        Span::styled(format!(" {:7}", operation_item.path), Color::White),
+        Span::raw(format!(" {:7}", operation_item.path)),
       ]))
     });
 
