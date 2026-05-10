@@ -15,6 +15,7 @@ pub enum Action {
   Refresh,
   Error(String),
   Help,
+  CloseHelp,
   FocusNext,
   FocusPrev,
   Focus,

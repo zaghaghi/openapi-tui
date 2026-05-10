@@ -13,7 +13,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::{home::Home, phone::Phone, Page},
-  panes::{auth::AuthPane, footer::FooterPane, header::HeaderPane, history::HistoryPane, Pane},
+  panes::{auth::AuthPane, footer::FooterPane, header::HeaderPane, help::HelpPane, history::HistoryPane, Pane},
   request::Request,
   response::Response,
   state::{InputMode, OperationItemType, State},
@@ -252,6 +252,12 @@ impl App {
             }
             self.popup = None;
           },
+          Action::Help => {
+            self.popup = Some(Box::new(HelpPane::new()));
+          },
+          Action::CloseHelp => {
+            self.popup = None;
+          },
           _ => {},
         }
 
@@ -326,7 +332,7 @@ impl App {
     if let Some(popup) = &mut self.popup {
       let popup_vertical_layout =
         Layout::vertical(vec![Constraint::Fill(1), popup.height_constraint(), Constraint::Fill(1)]).split(frame.area());
-      let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1), Constraint::Fill(1)])
+      let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), popup.width_constraint(), Constraint::Fill(1)])
         .split(popup_vertical_layout[1]);
       popup.draw(frame, popup_layout[1], &self.state)?;
     }

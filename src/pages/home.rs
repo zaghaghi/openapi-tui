@@ -133,6 +133,8 @@ impl Page for Home {
           actions.push(Some(Action::History));
         } else if args.eq("auth") {
           actions.push(Some(Action::Auth));
+        } else if args.eq("help") {
+          actions.push(Some(Action::Help));
         } else {
           actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
         }
