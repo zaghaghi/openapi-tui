@@ -168,8 +168,7 @@ impl ParameterEditor {
   }
 }
 
-impl RequestPane for ParameterEditor {
-}
+impl RequestPane for ParameterEditor {}
 
 impl RequestBuilder for ParameterEditor {
   fn path(&self, url: String) -> String {
@@ -219,14 +218,12 @@ impl Pane for ParameterEditor {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => {
-        match key.code {
-          KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
-          _ => {
-            self.input.handle_event(&Event::Key(key));
-            Ok(Some(EventResponse::Stop(Action::Noop)))
-          },
-        }
+      InputMode::Insert => match key.code {
+        KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
+        _ => {
+          self.input.handle_event(&Event::Key(key));
+          Ok(Some(EventResponse::Stop(Action::Noop)))
+        },
       },
       _ => Ok(None),
     }

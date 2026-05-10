@@ -221,18 +221,16 @@ fn to_node(
       }
       Node::Object(pairs)
     },
-    serde_json::Value::Array(items) => {
-      Node::Array(
-        items
-          .iter()
-          .enumerate()
-          .map(|(i, v)| {
-            let child_path = format!("{parent_path}/{i}");
-            to_node(v, &child_path, components, variant_selection, expanding)
-          })
-          .collect(),
-      )
-    },
+    serde_json::Value::Array(items) => Node::Array(
+      items
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+          let child_path = format!("{parent_path}/{i}");
+          to_node(v, &child_path, components, variant_selection, expanding)
+        })
+        .collect(),
+    ),
     _ => Node::Scalar(value.clone()),
   }
 }
@@ -244,11 +242,9 @@ fn all_of_members(value: &serde_json::Value) -> Option<&Vec<serde_json::Value>> 
 fn all_of_sources(members: &[serde_json::Value]) -> String {
   members
     .iter()
-    .map(|m| {
-      match ref_target_name(m) {
-        Some(name) => name.to_string(),
-        None => "<inline>".to_string(),
-      }
+    .map(|m| match ref_target_name(m) {
+      Some(name) => name.to_string(),
+      None => "<inline>".to_string(),
     })
     .collect::<Vec<_>>()
     .join(", ")
@@ -735,11 +731,9 @@ fn type_str_or_array(pairs: &[(String, Node)], key: &str) -> Option<String> {
     Node::Array(items) => {
       let parts: Vec<String> = items
         .iter()
-        .filter_map(|item| {
-          match item {
-            Node::Scalar(serde_json::Value::String(s)) if s != "null" => Some(s.clone()),
-            _ => None,
-          }
+        .filter_map(|item| match item {
+          Node::Scalar(serde_json::Value::String(s)) if s != "null" => Some(s.clone()),
+          _ => None,
         })
         .collect();
       if parts.is_empty() {
@@ -1339,11 +1333,9 @@ mod tests {
 
     let yaml = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect::<String>();
 
@@ -1368,11 +1360,9 @@ mod tests {
 
     let variants = blocks
       .iter()
-      .find_map(|b| {
-        match b {
-          RenderBlock::Variants { choices, selected, body_blocks, .. } => Some((choices, *selected, body_blocks)),
-          _ => None,
-        }
+      .find_map(|b| match b {
+        RenderBlock::Variants { choices, selected, body_blocks, .. } => Some((choices, *selected, body_blocks)),
+        _ => None,
       })
       .expect("expected a Variants block");
 
@@ -1382,11 +1372,9 @@ mod tests {
     let body_yaml: String = variants
       .2
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
     assert!(body_yaml.contains("x-tag: a"), "body did not have selected variant: {body_yaml}");
@@ -1417,11 +1405,9 @@ mod tests {
     let after_yaml: String = blocks
       .iter()
       .skip(marker_idx + 1)
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
     assert!(after_yaml.contains("name:"), "merged yaml missing 'name': {after_yaml}");
@@ -1501,22 +1487,18 @@ mod tests {
 
     let v = blocks
       .iter()
-      .find_map(|b| {
-        match b {
-          RenderBlock::Variants { selected, body_blocks, .. } => Some((*selected, body_blocks)),
-          _ => None,
-        }
+      .find_map(|b| match b {
+        RenderBlock::Variants { selected, body_blocks, .. } => Some((*selected, body_blocks)),
+        _ => None,
       })
       .expect("expected Variants");
     assert_eq!(v.0, 1);
     let body_yaml: String = v
       .1
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
     assert!(body_yaml.contains("x-tag: second"), "expected second variant in body: {body_yaml}");
@@ -1579,11 +1561,9 @@ mod tests {
 
     let yaml: String = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
 
@@ -1622,11 +1602,9 @@ mod tests {
     let blocks = walk(value, components);
     let yaml: String = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
 
@@ -1782,11 +1760,9 @@ mod tests {
 
     let field_lines: Vec<String> = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
 
@@ -1833,11 +1809,9 @@ mod tests {
     let blocks = walk_annotated(value, HashMap::new());
     let field_lines: Vec<String> = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
 
@@ -1865,11 +1839,9 @@ mod tests {
     let blocks = walk_annotated(value, HashMap::new());
     let field_lines: Vec<String> = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
 
@@ -1898,11 +1870,9 @@ mod tests {
 
     let field_lines: Vec<String> = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
     assert!(field_lines.iter().any(|l: &String| l.contains("name (string)?")), "merged name: {field_lines:?}");
@@ -1922,11 +1892,9 @@ mod tests {
 
     let variants = blocks
       .iter()
-      .find_map(|b| {
-        match b {
-          RenderBlock::Variants { choices, body_blocks, .. } => Some((choices, body_blocks)),
-          _ => None,
-        }
+      .find_map(|b| match b {
+        RenderBlock::Variants { choices, body_blocks, .. } => Some((choices, body_blocks)),
+        _ => None,
       })
       .expect("expected Variants block");
     assert_eq!(variants.0, &vec!["A".to_string(), "B".to_string()]);
@@ -1934,11 +1902,9 @@ mod tests {
     let body_field_lines: Vec<String> = variants
       .1
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
     assert!(
@@ -2000,11 +1966,9 @@ mod tests {
 
     let yaml: String = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::Yaml(s) => Some(s.as_str()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::Yaml(s) => Some(s.as_str()),
+        _ => None,
       })
       .collect();
     assert!(!yaml.is_empty(), "fallback YAML should be non-empty: {yaml}");
@@ -2286,11 +2250,9 @@ mod tests {
     let blocks = walk_annotated(value, HashMap::new());
     let field_lines: Vec<String> = blocks
       .iter()
-      .filter_map(|b| {
-        match b {
-          RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
-          _ => None,
-        }
+      .filter_map(|b| match b {
+        RenderBlock::AnnotatedField { field_line, .. } => Some(field_line.iter().map(|(_, t)| t.as_str()).collect()),
+        _ => None,
       })
       .collect();
 
