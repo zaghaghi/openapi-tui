@@ -2033,6 +2033,7 @@ name = "openapi-tui"
 version = "0.10.2"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "better-panic",
  "boon",
  "clap",
