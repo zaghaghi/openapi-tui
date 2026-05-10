@@ -217,10 +217,7 @@ impl Pane for ResponsePane {
         .border_style(self.border_style())
         .border_type(self.border_type())
         .title_bottom(
-          self
-            .nested_schema_path_line()
-            .style(Style::default().fg(Color::White).dim().add_modifier(Modifier::ITALIC))
-            .left_aligned(),
+          self.nested_schema_path_line().style(Style::default().dim().add_modifier(Modifier::ITALIC)).left_aligned(),
         ),
       area,
     );
