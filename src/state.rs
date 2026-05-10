@@ -20,6 +20,7 @@ pub struct State {
   pub responses: HashMap<String, Response>,
   pub pending_operations: HashSet<String>,
   pub spinner_frame: usize,
+  pub global_headers: Vec<(String, String)>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -72,6 +73,7 @@ impl State {
       responses: HashMap::default(),
       pending_operations: HashSet::default(),
       spinner_frame: 0,
+      global_headers: Vec::new(),
     })
   }
 
@@ -104,15 +106,18 @@ impl State {
       responses: HashMap::default(),
       pending_operations: HashSet::default(),
       spinner_frame: 0,
+      global_headers: Vec::new(),
     })
   }
 
-  pub async fn from_input(input: String) -> Result<Self> {
-    if let Ok(url) = reqwest::Url::parse(input.as_str()) {
-      State::from_url(url).await
+  pub async fn from_input(input: String, global_headers: Vec<(String, String)>) -> Result<Self> {
+    let mut state = if let Ok(url) = reqwest::Url::parse(input.as_str()) {
+      State::from_url(url).await?
     } else {
-      State::from_path(input).await
-    }
+      State::from_path(input).await?
+    };
+    state.global_headers = global_headers;
+    Ok(state)
   }
 
   pub fn get_operation(&self, operation_id: Option<String>) -> Option<&OperationItem> {

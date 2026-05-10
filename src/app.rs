@@ -42,8 +42,8 @@ pub struct App {
 }
 
 impl App {
-  pub async fn new(input: String) -> Result<Self> {
-    let state = State::from_input(input).await?;
+  pub async fn new(input: String, global_headers: Vec<(String, String)>) -> Result<Self> {
+    let state = State::from_input(input, global_headers).await?;
     let home = Home::new()?;
     let config = Config::new()?;
     let mode = Mode::Home;
