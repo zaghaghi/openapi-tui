@@ -46,7 +46,7 @@ pub trait RequestPane: Pane + RequestBuilder {}
 impl Phone {
   fn default_status_line() -> String {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]")
+    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [? {ARROW} help] [ESC {ARROW} close] [q {ARROW} quit]")
   }
 
   pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>, _state: &State) -> Result<Self> {
