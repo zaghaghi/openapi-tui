@@ -4,6 +4,7 @@ pub mod auth;
 pub mod cli;
 pub mod components;
 pub mod config;
+pub mod exporters;
 pub mod formatters;
 pub mod pages;
 pub mod panes;

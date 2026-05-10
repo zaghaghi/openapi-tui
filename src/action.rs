@@ -52,4 +52,5 @@ pub enum Action {
   SaveResponsePayload(String),
   ApplyJqQuery(String),
   ApplySearch(String),
+  Copy(String),
 }

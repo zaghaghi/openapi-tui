@@ -173,6 +173,7 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `q` | Quit |
 | `send`, `s` | Send request |
 | `auth` | Open authentication popup to set credentials for `components.securitySchemes` |
+| `copy [curl\|httpie]` | Copy the current request to the clipboard. Defaults to `curl`. e.g. `copy curl` |
 | `query`, `q` | Add or remove query strings. sub-commands are `add` or `rm`. e.g. `query add page` |
 | `header`, `h` | Add or remove headers. sub-commands are `add` or `rm`. e.g. `header add x-api-key` |
 | `request`, `r` | Load request payload. e.g. `request open /home/hamed/payload.json` |
