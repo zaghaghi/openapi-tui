@@ -14,6 +14,7 @@ pub mod auth;
 pub mod body_editor;
 pub mod footer;
 pub mod header;
+pub mod help;
 pub mod history;
 pub mod parameter_editor;
 pub mod request;
@@ -27,6 +28,10 @@ pub trait Pane {
   }
 
   fn height_constraint(&self) -> Constraint;
+
+  fn width_constraint(&self) -> Constraint {
+    Constraint::Fill(1)
+  }
 
   fn handle_events(&mut self, event: Event, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     let r = match event {

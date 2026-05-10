@@ -24,7 +24,7 @@ pub struct Home {
 impl Home {
   fn default_status_line() -> String {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [q {ARROW} quit]")
+    format!("[l,h {ARROW} pane movement] [/ {ARROW} api filter] [: {ARROW} commands] [? {ARROW} help] [q {ARROW} quit]")
   }
 
   pub fn new() -> Result<Self> {
@@ -133,6 +133,8 @@ impl Page for Home {
           actions.push(Some(Action::History));
         } else if args.eq("auth") {
           actions.push(Some(Action::Auth));
+        } else if args.eq("help") {
+          actions.push(Some(Action::Help));
         } else {
           actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
         }

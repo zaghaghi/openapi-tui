@@ -46,7 +46,7 @@ pub trait RequestPane: Pane + RequestBuilder {}
 impl Phone {
   fn default_status_line() -> String {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]")
+    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [? {ARROW} help] [ESC {ARROW} close] [q {ARROW} quit]")
   }
 
   pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>, _state: &State) -> Result<Self> {
@@ -99,6 +99,9 @@ impl Phone {
     }
     if command_args.eq("auth") {
       return Some(Action::Auth);
+    }
+    if command_args.eq("help") {
+      return Some(Action::Help);
     }
     if let Some(rest) = command_args.strip_prefix("copy") {
       let fmt = rest.trim();
@@ -293,7 +296,7 @@ impl Page for Phone {
         }
         if let Some(action) = self.handle_commands(args) {
           match action {
-            Action::TimedStatusLine(_, _) | Action::Auth | Action::Copy(_) => {
+            Action::TimedStatusLine(_, _) | Action::Auth | Action::Help | Action::Copy(_) => {
               actions.push(Some(action));
             },
             _ => {
