@@ -105,6 +105,14 @@ impl ParameterEditor {
           schema: parameter.schema.clone(),
         });
       });
+
+      for (name, value) in &state.global_headers {
+        if header_items.iter().any(|item: &ParameterItem| item.name.eq_ignore_ascii_case(name)) {
+          continue;
+        }
+        header_items.push(ParameterItem { name: name.clone(), value: Some(value.clone()), ..Default::default() });
+      }
+
       if !path_items.is_empty() {
         self.parameters.push(ParameterTab {
           location: "Path".to_string(),

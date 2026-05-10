@@ -12,4 +12,12 @@ pub struct Cli {
     help = "Input file or url, in json or yaml format with openapi specification"
   )]
   pub input: String,
+
+  #[arg(
+    short = 'H',
+    long = "header",
+    value_name = "NAME: VALUE",
+    help = "Global header to attach to every request, in `Name: Value` form. May be repeated."
+  )]
+  pub headers: Vec<String>,
 }

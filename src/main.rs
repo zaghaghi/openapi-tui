@@ -14,12 +14,21 @@ pub mod utils;
 
 use clap::Parser;
 use cli::Cli;
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Result};
 
 use crate::{
   app::App,
   utils::{initialize_logging, initialize_panic_handler},
 };
+
+fn parse_header(raw: &str) -> Result<(String, String)> {
+  let (name, value) = raw.split_once(':').ok_or_else(|| eyre!("invalid header `{raw}`: expected `Name: Value`"))?;
+  let name = name.trim();
+  if name.is_empty() {
+    return Err(eyre!("invalid header `{raw}`: empty name"));
+  }
+  Ok((name.to_string(), value.trim().to_string()))
+}
 
 async fn tokio_main() -> Result<()> {
   initialize_logging()?;
@@ -27,7 +36,8 @@ async fn tokio_main() -> Result<()> {
   initialize_panic_handler()?;
 
   let args = Cli::parse();
-  let mut app = App::new(args.input).await?;
+  let global_headers = args.headers.iter().map(|h| parse_header(h)).collect::<Result<Vec<_>>>()?;
+  let mut app = App::new(args.input, global_headers).await?;
   app.run().await?;
 
   Ok(())
