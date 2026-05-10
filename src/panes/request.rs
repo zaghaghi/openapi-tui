@@ -156,10 +156,10 @@ impl Pane for RequestPane {
         self.init_schema(state)?;
       },
       Action::Down => {
-        self.schema_viewer.down();
+        self.schema_viewer.down()?;
       },
       Action::Up => {
-        self.schema_viewer.up();
+        self.schema_viewer.up()?;
       },
       Action::Tab(index) if index < self.schemas.len().try_into()? => {
         self.schemas_index = index.try_into()?;
@@ -176,8 +176,9 @@ impl Pane for RequestPane {
       },
       Action::Focus => {
         self.focused = true;
-        static STATUS_LINE: &str = "[1-9 → select tab] [g,b → go/back definitions]";
-        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+        static STATUS_LINE: &str =
+          "[1-9 → select tab] [g,b → go/back definitions] [, . → switch variant] [a → toggle annotated/YAML]";
+        return Ok(Some(Action::StatusLine(STATUS_LINE.into())));
       },
       Action::UnFocus => {
         self.focused = false;
@@ -186,6 +187,21 @@ impl Pane for RequestPane {
       Action::Back => {
         if let Some(request_type) = self.schemas.get(self.schemas_index) {
           self.schema_viewer.back(request_type.schema.clone())?;
+        }
+      },
+      Action::PrevVariant => {
+        if let Some(request_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.prev_variant(&request_type.schema)?;
+        }
+      },
+      Action::NextVariant => {
+        if let Some(request_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.next_variant(&request_type.schema)?;
+        }
+      },
+      Action::ToggleSchemaView => {
+        if let Some(request_type) = self.schemas.get(self.schemas_index) {
+          self.schema_viewer.toggle_view(&request_type.schema)?;
         }
       },
       _ => {},

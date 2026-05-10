@@ -189,12 +189,14 @@ impl ResponseViewer {
 
     for output in filter.run((Ctx::new([], &inputs), input_val)) {
       match output {
-        Ok(val) => match serde_json::to_string_pretty(&serde_json::Value::from(val)) {
-          Ok(s) => parts.push(s),
-          Err(e) => {
-            parts.push(format!("Serialization error: {e}"));
-            has_error = true;
-          },
+        Ok(val) => {
+          match serde_json::to_string_pretty(&serde_json::Value::from(val)) {
+            Ok(s) => parts.push(s),
+            Err(e) => {
+              parts.push(format!("Serialization error: {e}"));
+              has_error = true;
+            },
+          }
         },
         Err(e) => {
           parts.push(format!("Error: {e:?}"));
@@ -213,7 +215,8 @@ impl ResponseViewer {
   }
 }
 
-impl RequestPane for ResponseViewer {}
+impl RequestPane for ResponseViewer {
+}
 
 impl RequestBuilder for ResponseViewer {
   fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -256,24 +259,28 @@ impl Pane for ResponseViewer {
     match action {
       Action::Update => {},
       Action::Submit => return Ok(Some(Action::Dial)),
-      Action::Down if self.focused => match &mut self.mode {
-        ViewerMode::Normal | ViewerMode::Jq(_, _) => {
-          self.scroll_offset = self.scroll_offset.saturating_add(1);
-        },
-        ViewerMode::Search(matches, current) if !matches.is_empty() => {
-          *current = (*current + 1) % matches.len();
-        },
-        _ => {},
+      Action::Down if self.focused => {
+        match &mut self.mode {
+          ViewerMode::Normal | ViewerMode::Jq(_, _) => {
+            self.scroll_offset = self.scroll_offset.saturating_add(1);
+          },
+          ViewerMode::Search(matches, current) if !matches.is_empty() => {
+            *current = (*current + 1) % matches.len();
+          },
+          _ => {},
+        }
       },
-      Action::Up if self.focused => match &mut self.mode {
-        ViewerMode::Normal | ViewerMode::Jq(_, _) => {
-          self.scroll_offset = self.scroll_offset.saturating_sub(1);
-        },
-        ViewerMode::Search(matches, current) if !matches.is_empty() => {
-          let len = matches.len();
-          *current = if *current == 0 { len - 1 } else { *current - 1 };
-        },
-        _ => {},
+      Action::Up if self.focused => {
+        match &mut self.mode {
+          ViewerMode::Normal | ViewerMode::Jq(_, _) => {
+            self.scroll_offset = self.scroll_offset.saturating_sub(1);
+          },
+          ViewerMode::Search(matches, current) if !matches.is_empty() => {
+            let len = matches.len();
+            *current = if *current == 0 { len - 1 } else { *current - 1 };
+          },
+          _ => {},
+        }
       },
       Action::Tab(index) if !self.content_types.is_empty() && index < self.content_types.len().try_into()? => {
         self.content_type_index = index.try_into()?;

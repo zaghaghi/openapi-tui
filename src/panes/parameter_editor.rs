@@ -168,7 +168,8 @@ impl ParameterEditor {
   }
 }
 
-impl RequestPane for ParameterEditor {}
+impl RequestPane for ParameterEditor {
+}
 
 impl RequestBuilder for ParameterEditor {
   fn path(&self, url: String) -> String {
@@ -199,9 +200,7 @@ impl RequestBuilder for ParameterEditor {
       .filter_map(|header_param| {
         let name = header_param.name.as_str();
         let value = header_param.value.as_deref().unwrap_or_default();
-        HeaderName::from_str(name)
-          .ok()
-          .and_then(|header_name| HeaderValue::from_str(value).ok().map(|header_value| (header_name, header_value)))
+        HeaderName::from_str(name).ok().zip(HeaderValue::from_str(value).ok())
       })
       .collect::<HeaderMap<_>>();
     request.query(&query_params).headers(header_params)
@@ -220,12 +219,14 @@ impl Pane for ParameterEditor {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => match key.code {
-        KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
-        _ => {
-          self.input.handle_event(&Event::Key(key));
-          Ok(Some(EventResponse::Stop(Action::Noop)))
-        },
+      InputMode::Insert => {
+        match key.code {
+          KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
+          _ => {
+            self.input.handle_event(&Event::Key(key));
+            Ok(Some(EventResponse::Stop(Action::Noop)))
+          },
+        }
       },
       _ => Ok(None),
     }

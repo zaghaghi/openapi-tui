@@ -48,7 +48,8 @@ impl AddressPane {
   }
 }
 
-impl RequestPane for AddressPane {}
+impl RequestPane for AddressPane {
+}
 
 impl RequestBuilder for AddressPane {
   fn path(&self, url: String) -> String {
@@ -71,7 +72,7 @@ impl Pane for AddressPane {
       Action::Focus => {
         self.focused = true;
         static STATUS_LINE: &str = "[ENTER → request]";
-        return Ok(Some(Action::TimedStatusLine(STATUS_LINE.into(), 3)));
+        return Ok(Some(Action::StatusLine(STATUS_LINE.into())));
       },
       Action::UnFocus => {
         self.focused = false;
@@ -102,22 +103,26 @@ impl Pane for AddressPane {
       let inner = area.inner(Margin { horizontal: 1, vertical: 1 });
       frame.render_widget(
         match operation_item.r#type {
-          OperationItemType::Path => Paragraph::new(Line::from(vec![
-            Span::styled(
-              format!("{:7}", operation_item.method.as_str()),
-              Style::default().fg(Self::method_color(operation_item.method.as_str())),
-            ),
-            Span::styled(base_url, Style::default().fg(Color::DarkGray)),
-            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
-          ])),
-          OperationItemType::Webhook => Paragraph::new(Line::from(vec![
-            Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
-            Span::styled(
-              format!("{} ", operation_item.method.as_str()),
-              Style::default().fg(Self::method_color(operation_item.method.as_str())),
-            ),
-            Span::styled(&operation_item.path, Style::default().fg(Color::White)),
-          ])),
+          OperationItemType::Path => {
+            Paragraph::new(Line::from(vec![
+              Span::styled(
+                format!("{:7}", operation_item.method.as_str()),
+                Style::default().fg(Self::method_color(operation_item.method.as_str())),
+              ),
+              Span::styled(base_url, Style::default().fg(Color::DarkGray)),
+              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            ]))
+          },
+          OperationItemType::Webhook => {
+            Paragraph::new(Line::from(vec![
+              Span::styled("EVENT ", Style::default().fg(Color::LightMagenta)),
+              Span::styled(
+                format!("{} ", operation_item.method.as_str()),
+                Style::default().fg(Self::method_color(operation_item.method.as_str())),
+              ),
+              Span::styled(&operation_item.path, Style::default().fg(Color::White)),
+            ]))
+          },
         },
         inner,
       );
