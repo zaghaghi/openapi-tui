@@ -11,12 +11,13 @@ Terminal UI to list, browse and run APIs defined with OpenAPI v3.0 and v3.1 spec
 ❯ openapi-tui --help
 This TUI allows you to list and browse APIs described by the openapi specification.
 
-Usage: openapi-tui --input <PATH>
+Usage: openapi-tui [OPTIONS] --input <PATH>
 
 Options:
-  -i, --input <PATH>  Input file or url, in json or yaml format with openapi specification
-  -h, --help          Print help
-  -V, --version       Print version
+  -i, --input <PATH>          Input file or url, in json or yaml format with openapi specification
+  -H, --header <NAME: VALUE>  Global header to attach to every request, in `Name: Value` form. May be repeated.
+  -h, --help                  Print help
+  -V, --version               Print version
 ```
 
 ## Examples
@@ -29,6 +30,9 @@ Options:
 
 # open remote file
 ❯ openapi-tui -i https://raw.githubusercontent.com/github/rest-api-description/main/descriptions-next/api.github.com/api.github.com.yaml
+
+# attach default headers to every request
+❯ openapi-tui -i examples/petstore.json -H 'Authorization: Bearer xyz' -H 'X-Env: dev'
 ```
 
 
@@ -161,12 +165,14 @@ Then, add `openapi-tui` to your `configuration.nix`
 | `q` | Quit |
 | `request`, `r` | Go to request page|
 | `history` | Request history|
+| `auth` | Open authentication popup to set credentials for `components.securitySchemes` |
 
 # Commands Request Page
 | Command | Description |
 |:--------|:------------|
 | `q` | Quit |
 | `send`, `s` | Send request |
+| `auth` | Open authentication popup to set credentials for `components.securitySchemes` |
 | `query`, `q` | Add or remove query strings. sub-commands are `add` or `rm`. e.g. `query add page` |
 | `header`, `h` | Add or remove headers. sub-commands are `add` or `rm`. e.g. `header add x-api-key` |
 | `request`, `r` | Load request payload. e.g. `request open /home/hamed/payload.json` |
