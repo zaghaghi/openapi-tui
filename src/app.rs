@@ -13,7 +13,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::{home::Home, phone::Phone, Page},
-  panes::{footer::FooterPane, header::HeaderPane, history::HistoryPane, Pane},
+  panes::{auth::AuthPane, footer::FooterPane, header::HeaderPane, history::HistoryPane, Pane},
   request::Request,
   response::Response,
   state::{InputMode, OperationItemType, State},
@@ -241,6 +241,15 @@ impl App {
             self.popup = Some(Box::new(history_popup));
           },
           Action::CloseHistory => {
+            self.popup = None;
+          },
+          Action::Auth => {
+            self.popup = Some(Box::new(AuthPane::new(&self.state)));
+          },
+          Action::CloseAuth => {
+            if self.state.input_mode == InputMode::Insert {
+              self.state.input_mode = InputMode::Normal;
+            }
             self.popup = None;
           },
           _ => {},

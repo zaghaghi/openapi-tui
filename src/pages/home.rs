@@ -131,6 +131,8 @@ impl Page for Home {
             .push(Some(Action::NewCall(state.active_operation().and_then(|op| op.operation.operation_id.clone()))));
         } else if args.eq("history") {
           actions.push(Some(Action::History));
+        } else if args.eq("auth") {
+          actions.push(Some(Action::Auth));
         } else {
           actions.push(Some(Action::TimedStatusLine("unknown command".into(), 1)));
         }

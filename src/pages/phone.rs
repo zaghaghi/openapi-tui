@@ -7,6 +7,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
   action::Action,
+  auth,
   config::Config,
   pages::Page,
   panes::{
@@ -67,13 +68,23 @@ impl Phone {
     })
   }
 
-  fn build_request(&self) -> Result<reqwest::Request> {
+  fn build_request(&self, state: &State) -> Result<reqwest::Request> {
     let url = self.panes.iter().fold(self.operation_item.path.clone(), |url, pane| pane.path(url));
     let method = reqwest::Method::from_bytes(self.operation_item.method.as_bytes())?;
-    let request_builder = self
+    let mut request_builder = self
       .panes
       .iter()
       .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.reqeust(request_builder));
+
+    if let Some(options) = state.effective_security(&self.operation_item.operation) {
+      if let Some(picked) = auth::select_satisfied_option(&options, &state.auth_values) {
+        for scheme_name in picked {
+          if let (Some(scheme), Some(value)) = (state.auth_scheme(scheme_name), state.auth_values.get(scheme_name)) {
+            request_builder = auth::apply_scheme(request_builder, scheme, value);
+          }
+        }
+      }
+    }
 
     Ok(request_builder.build()?)
   }
@@ -84,6 +95,9 @@ impl Phone {
     }
     if command_args.eq("send") || command_args.eq("s") {
       return Some(Action::Dial);
+    }
+    if command_args.eq("auth") {
+      return Some(Action::Auth);
     }
     if command_args.starts_with("query ") || command_args.starts_with("q ") {
       let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
@@ -241,7 +255,7 @@ impl Page for Phone {
       Action::Dial => {
         if let Some(request_tx) = &self.request_tx {
           request_tx.send(Request {
-            request: self.build_request()?,
+            request: self.build_request(state)?,
             operation_id: self.operation_item.operation.operation_id.clone().unwrap_or_default(),
           })?;
         }
@@ -256,12 +270,15 @@ impl Page for Phone {
           pane.update(Action::Focus, state)?;
         }
         if let Some(action) = self.handle_commands(args) {
-          if let Action::TimedStatusLine(_, _) = action {
-            actions.push(Some(action));
-          } else {
-            for pane in self.panes.iter_mut() {
-              actions.push(pane.update(action.clone(), state)?);
-            }
+          match action {
+            Action::TimedStatusLine(_, _) | Action::Auth => {
+              actions.push(Some(action));
+            },
+            _ => {
+              for pane in self.panes.iter_mut() {
+                actions.push(pane.update(action.clone(), state)?);
+              }
+            },
           }
         }
       },

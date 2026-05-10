@@ -10,6 +10,7 @@ use crate::{
 
 pub mod address;
 pub mod apis;
+pub mod auth;
 pub mod body_editor;
 pub mod footer;
 pub mod header;

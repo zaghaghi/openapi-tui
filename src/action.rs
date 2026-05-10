@@ -42,6 +42,8 @@ pub enum Action {
   Dial,
   History,
   CloseHistory,
+  Auth,
+  CloseAuth,
   AddQuery(String),
   RemoveQuery(String),
   AddHeader(String),
