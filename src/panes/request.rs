@@ -83,11 +83,13 @@ impl RequestPane {
         if let Some(request_body) = &operation_item.operation.request_body {
           let mut bodies = serde_json::Map::new();
 
-          request_body.resolve(&state.openapi_spec).unwrap().content.iter().for_each(|(media_type, media)| {
-            if let Some(schema) = &media.schema {
-              bodies.insert(media_type.clone(), schema.clone());
-            }
-          });
+          if let Ok(request_body) = request_body.resolve(&state.openapi_spec) {
+            request_body.content.iter().for_each(|(media_type, media)| {
+              if let Some(schema) = &media.schema {
+                bodies.insert(media_type.clone(), schema.clone());
+              }
+            });
+          }
 
           push_schema!(bodies, "Body", "body");
         }
@@ -95,16 +97,21 @@ impl RequestPane {
         let mut header_parameters = serde_json::Map::new();
         let mut path_parameters = serde_json::Map::new();
         let mut cookie_parameters = serde_json::Map::new();
-        operation_item.operation.parameters.iter().flatten().for_each(|parameter_or_ref| {
-          let parameter = parameter_or_ref.resolve(&state.openapi_spec).unwrap();
-          match parameter.r#in {
-            In::Query => &mut query_parameters,
-            In::Header => &mut header_parameters,
-            In::Path => &mut path_parameters,
-            In::Cookie => &mut cookie_parameters,
-          }
-          .insert(parameter.name.clone(), parameter.schema.as_ref().unwrap_or(&serde_json::Value::Null).clone());
-        });
+        operation_item
+          .operation
+          .parameters
+          .iter()
+          .flatten()
+          .filter_map(|parameter_or_ref| parameter_or_ref.resolve(&state.openapi_spec).ok())
+          .for_each(|parameter| {
+            match parameter.r#in {
+              In::Query => &mut query_parameters,
+              In::Header => &mut header_parameters,
+              In::Path => &mut path_parameters,
+              In::Cookie => &mut cookie_parameters,
+            }
+            .insert(parameter.name.clone(), parameter.schema.as_ref().unwrap_or(&serde_json::Value::Null).clone());
+          });
 
         push_schema!(query_parameters, "Query", "query");
         push_schema!(header_parameters, "Header", "header");
@@ -240,5 +247,45 @@ impl Pane for RequestPane {
     );
 
     Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use openapi_31::v31::Openapi;
+  use serde_json::json;
+
+  use super::*;
+  use crate::state::{OperationItem, State};
+
+  #[test]
+  fn init_schema_skips_unresolvable_parameter_ref() {
+    let spec: Openapi = serde_json::from_value(json!({
+      "openapi": "3.1.0",
+      "info": { "title": "t", "version": "1" },
+      "paths": {
+        "/items": {
+          "get": {
+            "parameters": [{ "$ref": "#/components/schemas/Missing" }],
+            "responses": {}
+          }
+        }
+      }
+    }))
+    .unwrap();
+    let openapi_operations = spec
+      .into_operations()
+      .map(|(path, method, operation)| OperationItem { path, method, operation, ..Default::default() })
+      .collect();
+    let openapi_spec = serde_json::from_value(json!({
+      "openapi": "3.1.0",
+      "info": { "title": "t", "version": "1" },
+      "paths": {}
+    }))
+    .unwrap();
+    let state = State { openapi_operations, openapi_spec, ..Default::default() };
+
+    let mut pane = RequestPane::new(false, Style::default());
+    assert!(pane.init(&state).is_ok());
   }
 }

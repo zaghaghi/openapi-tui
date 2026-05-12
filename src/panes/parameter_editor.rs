@@ -88,23 +88,29 @@ impl ParameterEditor {
       let mut header_items = vec![];
       let mut cookie_items = vec![];
 
-      self.operation_item.operation.parameters.iter().flatten().for_each(|parameter_or_ref| {
-        let parameter = parameter_or_ref.resolve(&state.openapi_spec).unwrap();
-        let value =
-          parameter.schema.clone().and_then(|schema| schema.get("default").map(|default| default.to_string()));
-        match parameter.r#in {
-          In::Query => &mut query_items,
-          In::Header => &mut header_items,
-          In::Path => &mut path_items,
-          In::Cookie => &mut cookie_items,
-        }
-        .push(ParameterItem {
-          name: parameter.name.clone(),
-          value,
-          required: parameter.required.unwrap_or(false),
-          schema: parameter.schema.clone(),
+      self
+        .operation_item
+        .operation
+        .parameters
+        .iter()
+        .flatten()
+        .filter_map(|parameter_or_ref| parameter_or_ref.resolve(&state.openapi_spec).ok())
+        .for_each(|parameter| {
+          let value =
+            parameter.schema.clone().and_then(|schema| schema.get("default").map(|default| default.to_string()));
+          match parameter.r#in {
+            In::Query => &mut query_items,
+            In::Header => &mut header_items,
+            In::Path => &mut path_items,
+            In::Cookie => &mut cookie_items,
+          }
+          .push(ParameterItem {
+            name: parameter.name.clone(),
+            value,
+            required: parameter.required.unwrap_or(false),
+            schema: parameter.schema.clone(),
+          });
         });
-      });
 
       for (name, value) in &state.global_headers {
         if header_items.iter().any(|item: &ParameterItem| item.name.eq_ignore_ascii_case(name)) {
