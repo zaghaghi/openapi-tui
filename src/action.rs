@@ -15,6 +15,7 @@ pub enum Action {
   Refresh,
   Error(String),
   Help,
+  CloseHelp,
   FocusNext,
   FocusPrev,
   Focus,
@@ -42,6 +43,8 @@ pub enum Action {
   Dial,
   History,
   CloseHistory,
+  Auth,
+  CloseAuth,
   AddQuery(String),
   RemoveQuery(String),
   AddHeader(String),
@@ -50,4 +53,5 @@ pub enum Action {
   SaveResponsePayload(String),
   ApplyJqQuery(String),
   ApplySearch(String),
+  Copy(String),
 }

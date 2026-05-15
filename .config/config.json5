@@ -4,7 +4,8 @@
       "<q>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend" // Suspend the application
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<?>": "Help" // Show help popup with keys and commands
     },
   }
 }

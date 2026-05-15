@@ -13,7 +13,7 @@ use crate::{
   action::Action,
   config::Config,
   pages::{home::Home, phone::Phone, Page},
-  panes::{footer::FooterPane, header::HeaderPane, history::HistoryPane, Pane},
+  panes::{auth::AuthPane, footer::FooterPane, header::HeaderPane, help::HelpPane, history::HistoryPane, Pane},
   request::Request,
   response::Response,
   state::{InputMode, OperationItemType, State},
@@ -42,8 +42,8 @@ pub struct App {
 }
 
 impl App {
-  pub async fn new(input: String) -> Result<Self> {
-    let state = State::from_input(input).await?;
+  pub async fn new(input: String, global_headers: Vec<(String, String)>) -> Result<Self> {
+    let state = State::from_input(input, global_headers).await?;
     let home = Home::new()?;
     let config = Config::new()?;
     let mode = Mode::Home;
@@ -94,8 +94,24 @@ impl App {
           .popup
           .as_mut()
           .and_then(|pane| pane.handle_events(e.clone(), &mut self.state).ok())
-          .map(|response| {
-            match response {
+          .map(|response| match response {
+            Some(tui::EventResponse::Continue(action)) => {
+              action_tx.send(action).ok();
+              false
+            },
+            Some(tui::EventResponse::Stop(action)) => {
+              action_tx.send(action).ok();
+              true
+            },
+            _ => false,
+          })
+          .unwrap_or(false);
+        stop_event_propagation = stop_event_propagation
+          || self
+            .pages
+            .get_mut(self.active_page)
+            .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
+            .map(|response| match response {
               Some(tui::EventResponse::Continue(action)) => {
                 action_tx.send(action).ok();
                 false
@@ -105,26 +121,6 @@ impl App {
                 true
               },
               _ => false,
-            }
-          })
-          .unwrap_or(false);
-        stop_event_propagation = stop_event_propagation
-          || self
-            .pages
-            .get_mut(self.active_page)
-            .and_then(|page| page.handle_events(e.clone(), &mut self.state).ok())
-            .map(|response| {
-              match response {
-                Some(tui::EventResponse::Continue(action)) => {
-                  action_tx.send(action).ok();
-                  false
-                },
-                Some(tui::EventResponse::Stop(action)) => {
-                  action_tx.send(action).ok();
-                  true
-                },
-                _ => false,
-              }
             })
             .unwrap_or(false);
 
@@ -132,18 +128,16 @@ impl App {
           || self
             .footer
             .handle_events(e.clone(), &mut self.state)
-            .map(|response| {
-              match response {
-                Some(tui::EventResponse::Continue(action)) => {
-                  action_tx.send(action).ok();
-                  false
-                },
-                Some(tui::EventResponse::Stop(action)) => {
-                  action_tx.send(action).ok();
-                  true
-                },
-                _ => false,
-              }
+            .map(|response| match response {
+              Some(tui::EventResponse::Continue(action)) => {
+                action_tx.send(action).ok();
+                false
+              },
+              Some(tui::EventResponse::Stop(action)) => {
+                action_tx.send(action).ok();
+                true
+              },
+              _ => false,
             })
             .unwrap_or(false);
 
@@ -249,6 +243,21 @@ impl App {
           Action::CloseHistory => {
             self.popup = None;
           },
+          Action::Auth => {
+            self.popup = Some(Box::new(AuthPane::new(&self.state)));
+          },
+          Action::CloseAuth => {
+            if self.state.input_mode == InputMode::Insert {
+              self.state.input_mode = InputMode::Normal;
+            }
+            self.popup = None;
+          },
+          Action::Help => {
+            self.popup = Some(Box::new(HelpPane::new()));
+          },
+          Action::CloseHelp => {
+            self.popup = None;
+          },
           _ => {},
         }
 
@@ -323,7 +332,7 @@ impl App {
     if let Some(popup) = &mut self.popup {
       let popup_vertical_layout =
         Layout::vertical(vec![Constraint::Fill(1), popup.height_constraint(), Constraint::Fill(1)]).split(frame.area());
-      let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1), Constraint::Fill(1)])
+      let popup_layout = Layout::horizontal(vec![Constraint::Fill(1), popup.width_constraint(), Constraint::Fill(1)])
         .split(popup_vertical_layout[1]);
       popup.draw(frame, popup_layout[1], &self.state)?;
     }

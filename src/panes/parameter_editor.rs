@@ -88,23 +88,37 @@ impl ParameterEditor {
       let mut header_items = vec![];
       let mut cookie_items = vec![];
 
-      self.operation_item.operation.parameters.iter().flatten().for_each(|parameter_or_ref| {
-        let parameter = parameter_or_ref.resolve(&state.openapi_spec).unwrap();
-        let value =
-          parameter.schema.clone().and_then(|schema| schema.get("default").map(|default| default.to_string()));
-        match parameter.r#in {
-          In::Query => &mut query_items,
-          In::Header => &mut header_items,
-          In::Path => &mut path_items,
-          In::Cookie => &mut cookie_items,
-        }
-        .push(ParameterItem {
-          name: parameter.name.clone(),
-          value,
-          required: parameter.required.unwrap_or(false),
-          schema: parameter.schema.clone(),
+      self
+        .operation_item
+        .operation
+        .parameters
+        .iter()
+        .flatten()
+        .filter_map(|parameter_or_ref| parameter_or_ref.resolve(&state.openapi_spec).ok())
+        .for_each(|parameter| {
+          let value =
+            parameter.schema.clone().and_then(|schema| schema.get("default").map(|default| default.to_string()));
+          match parameter.r#in {
+            In::Query => &mut query_items,
+            In::Header => &mut header_items,
+            In::Path => &mut path_items,
+            In::Cookie => &mut cookie_items,
+          }
+          .push(ParameterItem {
+            name: parameter.name.clone(),
+            value,
+            required: parameter.required.unwrap_or(false),
+            schema: parameter.schema.clone(),
+          });
         });
-      });
+
+      for (name, value) in &state.global_headers {
+        if header_items.iter().any(|item: &ParameterItem| item.name.eq_ignore_ascii_case(name)) {
+          continue;
+        }
+        header_items.push(ParameterItem { name: name.clone(), value: Some(value.clone()), ..Default::default() });
+      }
+
       if !path_items.is_empty() {
         self.parameters.push(ParameterTab {
           location: "Path".to_string(),
@@ -168,8 +182,7 @@ impl ParameterEditor {
   }
 }
 
-impl RequestPane for ParameterEditor {
-}
+impl RequestPane for ParameterEditor {}
 
 impl RequestBuilder for ParameterEditor {
   fn path(&self, url: String) -> String {
@@ -219,14 +232,12 @@ impl Pane for ParameterEditor {
 
   fn handle_key_events(&mut self, key: KeyEvent, state: &mut State) -> Result<Option<EventResponse<Action>>> {
     match state.input_mode {
-      InputMode::Insert => {
-        match key.code {
-          KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
-          _ => {
-            self.input.handle_event(&Event::Key(key));
-            Ok(Some(EventResponse::Stop(Action::Noop)))
-          },
-        }
+      InputMode::Insert => match key.code {
+        KeyCode::Enter => Ok(Some(EventResponse::Stop(Action::Submit))),
+        _ => {
+          self.input.handle_event(&Event::Key(key));
+          Ok(Some(EventResponse::Stop(Action::Noop)))
+        },
       },
       _ => Ok(None),
     }

@@ -7,7 +7,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
   action::Action,
+  auth,
   config::Config,
+  exporters,
   pages::Page,
   panes::{
     address::AddressPane, body_editor::BodyEditor, parameter_editor::ParameterEditor, response_viewer::ResponseViewer,
@@ -44,7 +46,7 @@ pub trait RequestPane: Pane + RequestBuilder {}
 impl Phone {
   fn default_status_line() -> String {
     const ARROW: &str = symbols::scrollbar::HORIZONTAL.end;
-    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [ESC {ARROW} close] [q {ARROW} quit]")
+    format!("[⏎ {ARROW} edit mode/execute request] [1-9 {ARROW} select items] [? {ARROW} help] [ESC {ARROW} close] [q {ARROW} quit]")
   }
 
   pub fn new(operation_item: OperationItem, request_tx: UnboundedSender<Request>, _state: &State) -> Result<Self> {
@@ -67,13 +69,23 @@ impl Phone {
     })
   }
 
-  fn build_request(&self) -> Result<reqwest::Request> {
+  fn build_request(&self, state: &State) -> Result<reqwest::Request> {
     let url = self.panes.iter().fold(self.operation_item.path.clone(), |url, pane| pane.path(url));
     let method = reqwest::Method::from_bytes(self.operation_item.method.as_bytes())?;
-    let request_builder = self
+    let mut request_builder = self
       .panes
       .iter()
       .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.reqeust(request_builder));
+
+    if let Some(options) = state.effective_security(&self.operation_item.operation) {
+      if let Some(picked) = auth::select_satisfied_option(&options, &state.auth_values) {
+        for scheme_name in picked {
+          if let (Some(scheme), Some(value)) = (state.auth_scheme(scheme_name), state.auth_values.get(scheme_name)) {
+            request_builder = auth::apply_scheme(request_builder, scheme, value);
+          }
+        }
+      }
+    }
 
     Ok(request_builder.build()?)
   }
@@ -84,6 +96,20 @@ impl Phone {
     }
     if command_args.eq("send") || command_args.eq("s") {
       return Some(Action::Dial);
+    }
+    if command_args.eq("auth") {
+      return Some(Action::Auth);
+    }
+    if command_args.eq("help") {
+      return Some(Action::Help);
+    }
+    if let Some(rest) = command_args.strip_prefix("copy") {
+      let fmt = rest.trim();
+      let fmt = if fmt.is_empty() { "curl" } else { fmt };
+      if fmt == "curl" || fmt == "httpie" {
+        return Some(Action::Copy(fmt.to_string()));
+      }
+      return Some(Action::TimedStatusLine("invalid format. supported: curl, httpie".into(), 3));
     }
     if command_args.starts_with("query ") || command_args.starts_with("q ") {
       let command_parts = command_args.split(' ').filter(|item| !item.is_empty()).collect::<Vec<_>>();
@@ -136,7 +162,7 @@ impl Phone {
       return Some(Action::ApplySearch(String::new()));
     }
     Some(Action::TimedStatusLine(
-      "unknown command. available commands are: send, query, header, request, response, jq, search".into(),
+      "unknown command. available: send, auth, copy, query, header, request, response, jq, search".into(),
       3,
     ))
   }
@@ -241,10 +267,23 @@ impl Page for Phone {
       Action::Dial => {
         if let Some(request_tx) = &self.request_tx {
           request_tx.send(Request {
-            request: self.build_request()?,
+            request: self.build_request(state)?,
             operation_id: self.operation_item.operation.operation_id.clone().unwrap_or_default(),
           })?;
         }
+      },
+      Action::Copy(ref format) => {
+        let request = self.build_request(state)?;
+        let rendered = match format.as_str() {
+          "curl" => exporters::to_curl(&request),
+          "httpie" => exporters::to_httpie(&request),
+          _ => return Ok(Some(Action::TimedStatusLine("unknown copy format".into(), 2))),
+        };
+        let msg = match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(rendered)) {
+          Ok(()) => format!("copied request as {format}"),
+          Err(e) => format!("clipboard unavailable: {e}"),
+        };
+        actions.push(Some(Action::TimedStatusLine(msg, 2)));
       },
       Action::FocusFooter(..) => {
         if let Some(pane) = self.panes.get_mut(self.focused_pane_index) {
@@ -256,12 +295,15 @@ impl Page for Phone {
           pane.update(Action::Focus, state)?;
         }
         if let Some(action) = self.handle_commands(args) {
-          if let Action::TimedStatusLine(_, _) = action {
-            actions.push(Some(action));
-          } else {
-            for pane in self.panes.iter_mut() {
-              actions.push(pane.update(action.clone(), state)?);
-            }
+          match action {
+            Action::TimedStatusLine(_, _) | Action::Auth | Action::Help | Action::Copy(_) => {
+              actions.push(Some(action));
+            },
+            _ => {
+              for pane in self.panes.iter_mut() {
+                actions.push(pane.update(action.clone(), state)?);
+              }
+            },
           }
         }
       },

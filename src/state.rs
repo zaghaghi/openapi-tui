@@ -1,5 +1,5 @@
 use std::{
-  collections::{HashMap, HashSet},
+  collections::{BTreeMap, HashMap, HashSet},
   env,
   io::IsTerminal,
 };
@@ -8,7 +8,10 @@ use color_eyre::eyre::{eyre, Result};
 use openapi_31::v31::{Openapi, Operation, Server};
 use tokio::io::AsyncReadExt;
 
-use crate::response::Response;
+use crate::{
+  auth::{self, AuthScheme},
+  response::Response,
+};
 
 #[derive(Default)]
 pub struct State {
@@ -22,6 +25,10 @@ pub struct State {
   pub responses: HashMap<String, Response>,
   pub pending_operations: HashSet<String>,
   pub spinner_frame: usize,
+  pub global_headers: Vec<(String, String)>,
+  pub auth_schemes: Vec<AuthScheme>,
+  pub auth_values: HashMap<String, String>,
+  pub global_security: Option<Vec<BTreeMap<String, Vec<String>>>>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -48,12 +55,9 @@ pub enum InputMode {
 }
 
 impl State {
-  async fn from_path(openapi_path: String) -> Result<Self> {
-    let openapi_spec = tokio::fs::read_to_string(&openapi_path)
-      .await
-      .map(|content| serde_yaml::from_str::<Openapi>(content.as_str()))??;
-
+  fn build(openapi_spec: Openapi, raw: &serde_yaml::Value, openapi_input_source: String) -> Self {
     let openapi_operations = openapi_spec
+      .clone()
       .into_operations()
       .map(|(path, method, operation)| {
         if path.starts_with('/') {
@@ -63,9 +67,13 @@ impl State {
         }
       })
       .collect::<Vec<_>>();
-    Ok(Self {
+
+    let auth_schemes = auth::parse_security_schemes(raw);
+    let global_security = raw.get("security").and_then(auth::parse_security_requirements);
+
+    Self {
       openapi_spec,
-      openapi_input_source: openapi_path,
+      openapi_input_source,
       openapi_operations,
       active_operation_index: 0,
       active_tag_name: None,
@@ -74,39 +82,29 @@ impl State {
       responses: HashMap::default(),
       pending_operations: HashSet::default(),
       spinner_frame: 0,
-    })
+      global_headers: Vec::new(),
+      auth_schemes,
+      auth_values: HashMap::default(),
+      global_security,
+    }
+  }
+
+  async fn from_path(openapi_path: String) -> Result<Self> {
+    let content = tokio::fs::read_to_string(&openapi_path).await?;
+    let openapi_spec = serde_yaml::from_str::<Openapi>(content.as_str())?;
+    let raw: serde_yaml::Value = serde_yaml::from_str(content.as_str())?;
+    Ok(Self::build(openapi_spec, &raw, openapi_path))
   }
 
   async fn from_url(openapi_url: reqwest::Url) -> Result<Self> {
     let resp: String = reqwest::get(openapi_url.clone()).await?.text().await?;
     let mut openapi_spec = serde_yaml::from_str::<Openapi>(resp.as_str())?;
+    let raw: serde_yaml::Value = serde_yaml::from_str(resp.as_str())?;
     if openapi_spec.servers.is_none() {
       let origin = openapi_url.origin().ascii_serialization();
       openapi_spec.servers = Some(vec![openapi_31::v31::Server::new(format!("{}/", origin))]);
     }
-
-    let openapi_operations = openapi_spec
-      .into_operations()
-      .map(|(path, method, operation)| {
-        if path.starts_with('/') {
-          OperationItem { path, method, operation, r#type: OperationItemType::Path }
-        } else {
-          OperationItem { path, method, operation, r#type: OperationItemType::Webhook }
-        }
-      })
-      .collect::<Vec<_>>();
-    Ok(Self {
-      openapi_spec,
-      openapi_input_source: openapi_url.to_string(),
-      openapi_operations,
-      active_operation_index: 0,
-      active_tag_name: None,
-      active_filter: String::default(),
-      input_mode: InputMode::Normal,
-      responses: HashMap::default(),
-      pending_operations: HashSet::default(),
-      spinner_frame: 0,
-    })
+    Ok(Self::build(openapi_spec, &raw, openapi_url.to_string()))
   }
 
   async fn from_stdin() -> Result<Self> {
@@ -125,39 +123,32 @@ impl State {
     }
 
     let openapi_spec = serde_yaml::from_str::<Openapi>(buffer.as_str())?;
-    let openapi_operations = openapi_spec
-      .into_operations()
-      .map(|(path, method, operation)| {
-        if path.starts_with('/') {
-          OperationItem { path, method, operation, r#type: OperationItemType::Path }
-        } else {
-          OperationItem { path, method, operation, r#type: OperationItemType::Webhook }
-        }
-      })
-      .collect::<Vec<_>>();
-    Ok(Self {
-      openapi_spec,
-      openapi_input_source: "<stdin>".to_string(),
-      openapi_operations,
-      active_operation_index: 0,
-      active_tag_name: None,
-      active_filter: String::default(),
-      input_mode: InputMode::Normal,
-      responses: HashMap::default(),
-      pending_operations: HashSet::default(),
-      spinner_frame: 0,
-    })
+    let raw: serde_yaml::Value = serde_yaml::from_str(buffer.as_str())?;
+    Ok(Self::build(openapi_spec, &raw, "<stdin>".to_string()))
   }
 
-  pub async fn from_input(input: String) -> Result<Self> {
-    if input == "-" {
-      return State::from_stdin().await;
-    }
-    if let Ok(url) = reqwest::Url::parse(input.as_str()) {
-      State::from_url(url).await
+  pub async fn from_input(input: String, global_headers: Vec<(String, String)>) -> Result<Self> {
+    let mut state = if input == "-" {
+      State::from_stdin().await?
+    } else if let Ok(url) = reqwest::Url::parse(input.as_str()) {
+      State::from_url(url).await?
     } else {
-      State::from_path(input).await
+      State::from_path(input).await?
+    };
+    state.global_headers = global_headers;
+    Ok(state)
+  }
+
+  pub fn effective_security(&self, operation: &Operation) -> Option<Vec<BTreeMap<String, Vec<String>>>> {
+    if let Some(per_op) = &operation.security {
+      Some(auth::parse_security_requirements_json(per_op))
+    } else {
+      self.global_security.clone()
     }
+  }
+
+  pub fn auth_scheme(&self, name: &str) -> Option<&AuthScheme> {
+    self.auth_schemes.iter().find(|s| s.name == name)
   }
 
   pub fn get_operation(&self, operation_id: Option<String>) -> Option<&OperationItem> {

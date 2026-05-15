@@ -101,16 +101,19 @@ impl Pane for ApisPane {
       }
       Some(Line::from(vec![
         Span::styled(
-          format!(" {:7}", match operation_item.r#type {
-            OperationItemType::Path => operation_item.method.as_str(),
-            OperationItemType::Webhook => "EVENT",
-          }),
+          format!(
+            " {:7}",
+            match operation_item.r#type {
+              OperationItemType::Path => operation_item.method.as_str(),
+              OperationItemType::Webhook => "EVENT",
+            }
+          ),
           match operation_item.r#type {
             OperationItemType::Path => Self::method_color(operation_item.method.as_str()),
             OperationItemType::Webhook => Color::LightMagenta,
           },
         ),
-        Span::styled(format!(" {:7}", operation_item.path), Color::White),
+        Span::raw(format!(" {:7}", operation_item.path)),
       ]))
     });
 
