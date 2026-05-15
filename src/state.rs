@@ -1,10 +1,12 @@
 use std::{
   collections::{BTreeMap, HashMap, HashSet},
   env,
+  io::IsTerminal,
 };
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{eyre, Result};
 use openapi_31::v31::{Openapi, Operation, Server};
+use tokio::io::AsyncReadExt;
 
 use crate::{
   auth::{self, AuthScheme},
@@ -105,8 +107,30 @@ impl State {
     Ok(Self::build(openapi_spec, &raw, openapi_url.to_string()))
   }
 
+  async fn from_stdin() -> Result<Self> {
+    // Guard against the user typing `openapi-tui --input -` without piping
+    // anything; without this the process silently waits for them to type a
+    // full spec + Ctrl-D, which looks like a hang.
+    if std::io::stdin().is_terminal() {
+      return Err(eyre!("--input - expects an OpenAPI spec piped to stdin (got a TTY)"));
+    }
+
+    let mut buffer = String::new();
+    tokio::io::stdin().read_to_string(&mut buffer).await?;
+
+    if buffer.trim().is_empty() {
+      return Err(eyre!("--input - received no data on stdin"));
+    }
+
+    let openapi_spec = serde_yaml::from_str::<Openapi>(buffer.as_str())?;
+    let raw: serde_yaml::Value = serde_yaml::from_str(buffer.as_str())?;
+    Ok(Self::build(openapi_spec, &raw, "<stdin>".to_string()))
+  }
+
   pub async fn from_input(input: String, global_headers: Vec<(String, String)>) -> Result<Self> {
-    let mut state = if let Ok(url) = reqwest::Url::parse(input.as_str()) {
+    let mut state = if input == "-" {
+      State::from_stdin().await?
+    } else if let Ok(url) = reqwest::Url::parse(input.as_str()) {
       State::from_url(url).await?
     } else {
       State::from_path(input).await?

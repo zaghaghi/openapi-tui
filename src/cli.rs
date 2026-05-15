@@ -9,7 +9,7 @@ pub struct Cli {
     short,
     long,
     value_name = "PATH",
-    help = "Input file or url, in json or yaml format with openapi specification"
+    help = "Input file path, URL, or `-` to read from stdin (json or yaml openapi spec)"
   )]
   pub input: String,
 
