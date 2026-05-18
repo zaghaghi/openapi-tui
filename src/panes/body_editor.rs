@@ -52,7 +52,7 @@ impl BodyEditor<'_> {
 impl RequestPane for BodyEditor<'_> {}
 
 impl RequestBuilder for BodyEditor<'_> {
-  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+  fn request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     if let Some(content_type) = self.content_types.get(self.content_type_index) {
       request.header("content-type", content_type).body(self.input.lines().join("\n"))
     } else {

@@ -36,7 +36,7 @@ pub trait RequestBuilder {
     url
   }
 
-  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+  fn request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     request
   }
 }
@@ -75,7 +75,7 @@ impl Phone {
     let mut request_builder = self
       .panes
       .iter()
-      .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.reqeust(request_builder));
+      .fold(reqwest::Client::new().request(method, url), |request_builder, pane| pane.request(request_builder));
 
     if let Some(options) = state.effective_security(&self.operation_item.operation) {
       if let Some(picked) = auth::select_satisfied_option(&options, &state.auth_values) {

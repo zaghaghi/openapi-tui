@@ -216,7 +216,7 @@ impl ResponseViewer {
 impl RequestPane for ResponseViewer {}
 
 impl RequestBuilder for ResponseViewer {
-  fn reqeust(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+  fn request(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
     if let Some(content_type) = self.content_types.get(self.content_type_index) {
       request.header("accept", content_type)
     } else {
