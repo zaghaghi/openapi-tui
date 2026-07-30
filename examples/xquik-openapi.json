@@ -1,0 +1,292 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Xquik API",
+    "version": "1.0",
+    "description": "Example OpenAPI 3.1 specification for browsing Xquik tweet search in openapi-tui."
+  },
+  "servers": [
+    {
+      "url": "https://xquik.com"
+    }
+  ],
+  "security": [
+    {
+      "apiKey": []
+    },
+    {
+      "oauthBearer": []
+    }
+  ],
+  "paths": {
+    "/api/v1/x/tweets/search": {
+      "get": {
+        "operationId": "searchTweets",
+        "summary": "Search tweets",
+        "tags": [
+          "Tweets"
+        ],
+        "security": [
+          {
+            "apiKey": []
+          },
+          {
+            "oauthBearer": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search query, tweet ID, or X status URL.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "openapi"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of tweets to return.",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Pagination cursor returned by the previous response.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTweets"
+                },
+                "example": {
+                  "tweets": [
+                    {
+                      "id": "1234567890",
+                      "text": "OpenAPI examples help API clients test auth and pagination.",
+                      "createdAt": "2026-01-15T12:00:00Z",
+                      "likeCount": 42,
+                      "retweetCount": 5,
+                      "replyCount": 3,
+                      "quoteCount": 1,
+                      "viewCount": 1500,
+                      "author": {
+                        "id": "9876543210",
+                        "username": "xquik",
+                        "name": "Xquik",
+                        "verified": true
+                      }
+                    }
+                  ],
+                  "has_next_page": true,
+                  "next_cursor": "DAACCgACGRElMJcAAA"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidInput"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitExceeded"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "API key passed via the x-api-key header."
+      },
+      "oauthBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "OAuth 2.1 bearer token."
+      },
+      "cookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-xquik_session",
+        "description": "Secure Xquik browser session cookie."
+      }
+    },
+    "schemas": {
+      "TweetAuthor": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "9876543210"
+          },
+          "username": {
+            "type": "string",
+            "example": "xquik"
+          },
+          "name": {
+            "type": "string",
+            "example": "Xquik"
+          },
+          "verified": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "Tweet": {
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "createdAt",
+          "author"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "1234567890"
+          },
+          "text": {
+            "type": "string",
+            "example": "OpenAPI examples help API clients test auth and pagination."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-01-15T12:00:00Z"
+          },
+          "likeCount": {
+            "type": "integer",
+            "example": 42
+          },
+          "retweetCount": {
+            "type": "integer",
+            "example": 5
+          },
+          "replyCount": {
+            "type": "integer",
+            "example": 3
+          },
+          "quoteCount": {
+            "type": "integer",
+            "example": 1
+          },
+          "viewCount": {
+            "type": "integer",
+            "example": 1500
+          },
+          "author": {
+            "$ref": "#/components/schemas/TweetAuthor"
+          }
+        }
+      },
+      "PaginatedTweets": {
+        "type": "object",
+        "required": [
+          "tweets",
+          "has_next_page"
+        ],
+        "properties": {
+          "tweets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tweet"
+            }
+          },
+          "has_next_page": {
+            "type": "boolean",
+            "example": true
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "DAACCgACGRElMJcAAA"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "missing_query"
+          }
+        }
+      }
+    },
+    "responses": {
+      "InvalidInput": {
+        "description": "Invalid input",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "missing_query"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "unauthenticated"
+            }
+          }
+        }
+      },
+      "RateLimitExceeded": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "rate_limit_exceeded"
+            }
+          }
+        }
+      }
+    }
+  }
+}

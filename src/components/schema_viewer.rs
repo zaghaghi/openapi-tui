@@ -1658,6 +1658,11 @@ mod tests {
     smoke_test_spec_with_mode("examples/petstore.json", ViewMode::Yaml);
   }
 
+  #[test]
+  fn e2e_xquik_all_schemas_resolve() {
+    smoke_test_spec("examples/xquik-openapi.json");
+  }
+
   /// Stripe's `account_business_profile` schema is the canonical
   /// sibling-keys-with-anyOf pattern: properties like `support_address`
   /// are `anyOf: [$ref Address]` plus sibling `description` and

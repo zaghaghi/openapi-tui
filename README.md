@@ -33,8 +33,25 @@ Options:
 
 # attach default headers to every request
 ❯ openapi-tui -i examples/petstore.json -H 'Authorization: Bearer xyz' -H 'X-Env: dev'
+
+# browse Xquik's current public OpenAPI 3.1 specification
+❯ openapi-tui -i https://xquik.com/openapi.json
+
+# call Xquik operations with an API key
+❯ openapi-tui -i https://xquik.com/openapi.json -H 'x-api-key: YOUR_API_KEY'
 ```
 
+The Xquik specification covers X search, timelines, profiles, lists,
+communities, bookmarks, and write operations. Browsing requires no credential.
+Set `apiKey` or `oauthBearer` through the `auth` command before sending a
+request. The compact
+[`examples/xquik-openapi.json`](examples/xquik-openapi.json) fixture keeps auth
+and schema-resolution tests deterministic. See the
+[Xquik API documentation](https://docs.xquik.com/api-reference/overview)
+for endpoint guidance.
+
+Xquik is an independent third-party service. Not affiliated with X Corp.
+"Twitter" and "X" are trademarks of X Corp.
 
 # Demo
 ![demo](static/demo.gif)
@@ -79,6 +96,12 @@ Just run the application with docker.
 ```bash
 # open local file
 ❯ docker run --rm -ti -v$(pwd)/examples:/opt zaghaghi/openapi-tui -i /opt/petstore.json
+
+# open the deterministic Xquik test fixture
+❯ docker run --rm -ti -v$(pwd)/examples:/opt zaghaghi/openapi-tui -i /opt/xquik-openapi.json
+
+# browse Xquik's current public specification
+❯ docker run --rm -it zaghaghi/openapi-tui -i https://xquik.com/openapi.json
 
 # open remote file
 ❯ docker run --rm -it zaghaghi/openapi-tui -i https://raw.githubusercontent.com/github/rest-api-description/main/descriptions-next/api.github.com/api.github.com.yaml
