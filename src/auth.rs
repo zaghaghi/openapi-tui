@@ -215,6 +215,30 @@ components:
   }
 
   #[test]
+  fn parses_xquik_example_security_schemes() {
+    let raw = std::fs::read_to_string("examples/xquik-openapi.json").expect("read xquik example");
+    let v = yaml(&raw);
+    let schemes = parse_security_schemes(&v);
+    let by_name: std::collections::HashMap<_, _> = schemes.iter().map(|s| (s.name.as_str(), &s.kind)).collect();
+
+    assert_eq!(schemes.len(), 3);
+    assert_eq!(
+      by_name["apiKey"],
+      &AuthKind::ApiKey { name: "x-api-key".to_string(), location: ApiKeyLocation::Header }
+    );
+    assert_eq!(by_name["oauthBearer"], &AuthKind::HttpBearer);
+    assert_eq!(
+      by_name["cookieSession"],
+      &AuthKind::ApiKey { name: "__Host-xquik_session".to_string(), location: ApiKeyLocation::Cookie }
+    );
+
+    let requirements = v.get("security").and_then(parse_security_requirements).expect("xquik security");
+    assert_eq!(requirements.len(), 2);
+    assert!(requirements.iter().any(|req| req.contains_key("apiKey")));
+    assert!(requirements.iter().any(|req| req.contains_key("oauthBearer")));
+  }
+
+  #[test]
   fn select_satisfied_picks_first_complete_option() {
     let options = vec![
       [("a".to_string(), vec![]), ("b".to_string(), vec![])].into_iter().collect(),
